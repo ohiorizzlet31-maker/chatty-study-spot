@@ -59,20 +59,6 @@ export function PrankWatcher({ name }: { name: string }) {
     };
   }, [name]);
 
-  useEffect(() => {
-    if (!active) return;
-    const interval = setInterval(() => {
-      setActive((prev) => {
-        if (!prev) return prev;
-        const elapsed = Math.floor((Date.now() - startedAtRef.current) / 1000);
-        const left = Math.max(0, prev.secondsLeft + 0); // dummy; recompute below
-        const remaining = Math.max(0, (prev.secondsLeft - 0) - elapsed + (prev as any)._init || 0);
-        return prev;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [active]);
-
   // Auto-stop after duration
   useEffect(() => {
     if (!active) return;
