@@ -2,14 +2,27 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { chatWithAI } from "@/server/ai";
-import { Send, X, Sparkles } from "lucide-react";
+import { Send, X, Sparkles, Trash2 } from "lucide-react";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
+const STORAGE = "studyroom_ai_history";
+const INITIAL: Msg[] = [
+  { role: "assistant", content: "Hi! I'm your AI study buddy. Ask me anything — concepts, focus tips, study plans." },
+];
+
+function loadHistory(): Msg[] {
+  try {
+    const raw = localStorage.getItem(STORAGE);
+    if (!raw) return INITIAL;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length) return parsed;
+  } catch {}
+  return INITIAL;
+}
+
 export function AIChatPanel({ onClose }: { onClose: () => void }) {
-  const [messages, setMessages] = useState<Msg[]>([
-    { role: "assistant", content: "Hi! I'm your AI study buddy. Ask me anything — concepts, focus tips, study plans." },
-  ]);
+  const [messages, setMessages] = useState<Msg[]>(loadHistory);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -17,6 +30,17 @@ export function AIChatPanel({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE, JSON.stringify(messages));
+    } catch {}
+  }, [messages]);
+
+  function clearHistory() {
+    setMessages(INITIAL);
+    try { localStorage.removeItem(STORAGE); } catch {}
+  }
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
@@ -43,7 +67,12 @@ export function AIChatPanel({ onClose }: { onClose: () => void }) {
         <h2 className="font-display text-lg font-bold flex items-center gap-2">
           <Sparkles className="w-4 h-4" style={{ color: "var(--accent)" }} /> AI Buddy
         </h2>
-        <Button variant="ghost" size="icon" onClick={onClose}><X className="w-4 h-4" /></Button>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" onClick={clearHistory} title="Clear history">
+            <Trash2 className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={onClose}><X className="w-4 h-4" /></Button>
+        </div>
       </div>
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.map((m, i) => (
