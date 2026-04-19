@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X } from "lucide-react";
+import { getSettings, saveSettings, AppSettings } from "@/lib/settings";
 
 const CLOAKS = [
   { name: "Google Classroom", favicon: "https://ssl.gstatic.com/classroom/favicon.png" },
@@ -38,12 +39,43 @@ export function applySavedCloak() {
   }
 }
 
+export function maybeAutoLaunchCloak() {
+  if (typeof window === "undefined") return;
+  if (sessionStorage.getItem("studyroom_autocloak_done")) return;
+  const s = getSettings();
+  if (s.autoCloak === "off") return;
+  sessionStorage.setItem("studyroom_autocloak_done", "1");
+  const url = window.location.href;
+  const title = document.title || "Google Classroom";
+  const favicon = document.querySelector<HTMLLinkElement>("link[rel~='icon']")?.href || "";
+  const html = `<!DOCTYPE html><html><head><title>${title}</title><link rel="icon" href="${favicon}"/></head><body style="margin:0"><iframe src="${url}" style="border:0;width:100vw;height:100vh"></iframe></body></html>`;
+  if (s.autoCloak === "about") {
+    const w = window.open("about:blank", "_blank");
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    window.location.replace("https://classroom.google.com");
+  } else if (s.autoCloak === "blob") {
+    const blob = new Blob([html], { type: "text/html" });
+    const blobUrl = URL.createObjectURL(blob);
+    window.open(blobUrl, "_blank");
+    window.location.replace("https://classroom.google.com");
+  }
+}
+
 export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const [customName, setCustomName] = useState("");
+  const [settings, setSettings] = useState<AppSettings>(getSettings());
 
   useEffect(() => {
     applySavedCloak();
   }, []);
+
+  function update<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
+    const next = { ...settings, [key]: value };
+    setSettings(next);
+    saveSettings(next);
+  }
 
   function applyCloak(name: string, favicon?: string) {
     document.title = name;
@@ -62,7 +94,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
     window.location.replace("https://classroom.google.com");
   }
 
-  async function openInBlob() {
+  function openInBlob() {
     const url = window.location.href;
     const title = document.title;
     const favicon = document.querySelector<HTMLLinkElement>("link[rel~='icon']")?.href || "";
@@ -85,6 +117,44 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        <section className="mb-6 space-y-3">
+          <h3 className="font-semibold">Privacy & UX</h3>
+          <Toggle
+            title="Hide Message Timestamps"
+            desc="Don't show when messages were sent"
+            checked={settings.hideTimestamps}
+            onChange={(v) => update("hideTimestamps", v)}
+          />
+          <Toggle
+            title="Hide Name"
+            desc="Send messages as 'Anonymous'"
+            checked={settings.hideName}
+            onChange={(v) => update("hideName", v)}
+          />
+          <Toggle
+            title="Anti Close Tab"
+            desc="Shows a confirmation dialog when trying to close the tab"
+            checked={settings.antiClose}
+            onChange={(v) => update("antiClose", v)}
+          />
+        </section>
+
+        <section className="mb-6">
+          <h3 className="font-semibold mb-2">Auto launch in disguise</h3>
+          <p className="text-sm text-muted-foreground mb-3">When you open the site, automatically open it inside about:blank or blob: and redirect this tab to Google Classroom.</p>
+          <div className="grid grid-cols-3 gap-2">
+            {(["off", "about", "blob"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => update("autoCloak", m)}
+                className={`py-2 rounded-xl border text-sm font-medium ${settings.autoCloak === m ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-primary/50"}`}
+              >
+                {m === "off" ? "Off" : m === "about" ? "about:blank" : "blob:"}
+              </button>
+            ))}
+          </div>
+        </section>
 
         <section className="mb-6">
           <h3 className="font-semibold mb-2">Tab Cloak</h3>
@@ -117,7 +187,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
         </section>
 
         <section>
-          <h3 className="font-semibold mb-2">Open in disguise</h3>
+          <h3 className="font-semibold mb-2">Open in disguise (now)</h3>
           <p className="text-sm text-muted-foreground mb-3">Opens this app in a new tab and redirects this one to Google Classroom.</p>
           <div className="flex gap-2">
             <Button variant="outline" onClick={openInAboutBlank} className="flex-1">about:blank</Button>
@@ -126,5 +196,22 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
         </section>
       </div>
     </div>
+  );
+}
+
+function Toggle({ title, desc, checked, onChange }: { title: string; desc: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex items-start gap-3 p-3 rounded-xl border border-border cursor-pointer hover:border-primary/50">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-1 w-4 h-4 accent-primary"
+      />
+      <div className="flex-1">
+        <p className="font-medium text-sm">{title}</p>
+        <p className="text-xs text-muted-foreground">{desc}</p>
+      </div>
+    </label>
   );
 }

@@ -3,12 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { X, Megaphone, Lock } from "lucide-react";
+import { X, Megaphone, Lock, BadgeCheck } from "lucide-react";
+import { isVerifiedName, checkVerifiedPassword } from "@/lib/verified";
 
 type Announcement = { id: string; author: string; content: string; created_at: string };
-
-const AUTHORIZED = ["Hallo_e99", "Aiden"];
-const ANNOUNCE_PASSWORD = "guh321";
 
 export function AnnouncementsPanel({ name, onClose }: { name: string; onClose: () => void }) {
   const [items, setItems] = useState<Announcement[]>([]);
@@ -16,7 +14,12 @@ export function AnnouncementsPanel({ name, onClose }: { name: string; onClose: (
   const [unlocked, setUnlocked] = useState(false);
   const [pw, setPw] = useState("");
   const [pwError, setPwError] = useState("");
-  const canTry = AUTHORIZED.includes(name);
+  const [canTry, setCanTry] = useState(false);
+  const [checking, setChecking] = useState(false);
+
+  useEffect(() => {
+    isVerifiedName(name).then(setCanTry);
+  }, [name]);
 
   useEffect(() => {
     let active = true;
@@ -42,6 +45,19 @@ export function AnnouncementsPanel({ name, onClose }: { name: string; onClose: (
     };
   }, []);
 
+  async function handleUnlock(e: React.FormEvent) {
+    e.preventDefault();
+    setChecking(true);
+    const ok = await checkVerifiedPassword(name, pw);
+    setChecking(false);
+    if (ok) {
+      setUnlocked(true);
+      setPwError("");
+    } else {
+      setPwError("Wrong password.");
+    }
+  }
+
   async function post(e: React.FormEvent) {
     e.preventDefault();
     const c = content.trim();
@@ -60,22 +76,11 @@ export function AnnouncementsPanel({ name, onClose }: { name: string; onClose: (
         </div>
 
         {canTry && !unlocked && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (pw === ANNOUNCE_PASSWORD) {
-                setUnlocked(true);
-                setPwError("");
-              } else {
-                setPwError("Wrong password.");
-              }
-            }}
-            className="mb-4 p-3 rounded-xl border border-border bg-muted/30"
-          >
+          <form onSubmit={handleUnlock} className="mb-4 p-3 rounded-xl border border-border bg-muted/30">
             <p className="text-sm font-medium mb-2 flex items-center gap-1"><Lock className="w-3 h-3" /> Verify to post</p>
             <div className="flex gap-2">
               <Input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Password" />
-              <Button type="submit" size="sm">Unlock</Button>
+              <Button type="submit" size="sm" disabled={checking}>{checking ? "…" : "Unlock"}</Button>
             </div>
             {pwError && <p className="text-xs text-destructive mt-1">{pwError}</p>}
           </form>
@@ -100,7 +105,10 @@ export function AnnouncementsPanel({ name, onClose }: { name: string; onClose: (
           {items.map((a) => (
             <div key={a.id} className="p-4 rounded-2xl border border-border bg-gradient-to-br from-primary/5 to-transparent">
               <div className="flex items-center justify-between mb-1">
-                <p className="font-semibold text-sm">{a.author}</p>
+                <p className="font-semibold text-sm flex items-center gap-1">
+                  {a.author}
+                  <BadgeCheck className="w-4 h-4 text-primary" />
+                </p>
                 <p className="text-xs text-muted-foreground">{new Date(a.created_at).toLocaleString()}</p>
               </div>
               <p className="whitespace-pre-wrap break-words text-sm">{a.content}</p>

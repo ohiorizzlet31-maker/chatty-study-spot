@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { StudyTips } from "@/components/StudyTips";
 import { SecretGate } from "@/components/SecretGate";
 import { ChatRoom } from "@/components/ChatRoom";
-import { applySavedCloak } from "@/components/SettingsPanel";
+import { applySavedCloak, maybeAutoLaunchCloak } from "@/components/SettingsPanel";
 
 type Stage = "tips" | "password" | "setup" | "chat";
 const STORAGE_KEY = "studyroom_profile";
@@ -26,6 +26,7 @@ function Index() {
   // Apply tab cloak + restore saved chat session on mount
   useEffect(() => {
     applySavedCloak();
+    maybeAutoLaunchCloak();
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
