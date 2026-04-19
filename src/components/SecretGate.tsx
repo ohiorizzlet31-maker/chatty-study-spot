@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { isVerifiedName, checkVerifiedPassword } from "@/lib/verified";
+import { BadgeCheck } from "lucide-react";
 
 const LANGUAGES = ["English", "Spanish", "Russian"];
 
@@ -19,6 +21,35 @@ export function SecretGate({
   const [error, setError] = useState("");
   const [name, setName] = useState("");
   const [language, setLanguage] = useState<string | null>(null);
+  const [verifyStage, setVerifyStage] = useState<"name" | "verifyPw">("name");
+  const [verifyPw, setVerifyPw] = useState("");
+  const [verifyError, setVerifyError] = useState("");
+  const [checking, setChecking] = useState(false);
+
+  async function handleSetupSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim() || !language) return;
+    if (verifyStage === "name") {
+      setChecking(true);
+      const verified = await isVerifiedName(name.trim());
+      setChecking(false);
+      if (verified) {
+        setVerifyStage("verifyPw");
+        return;
+      }
+      onSetupComplete(name.trim(), language);
+      return;
+    }
+    // verifyPw stage
+    setChecking(true);
+    const ok = await checkVerifiedPassword(name.trim(), verifyPw);
+    setChecking(false);
+    if (!ok) {
+      setVerifyError("Wrong verification password.");
+      return;
+    }
+    onSetupComplete(name.trim(), language);
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-md p-4">
@@ -51,13 +82,43 @@ export function SecretGate({
               <Button type="submit" className="flex-1">Enter</Button>
             </div>
           </form>
+        ) : verifyStage === "verifyPw" ? (
+          <form onSubmit={handleSetupSubmit}>
+            <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
+              <BadgeCheck className="w-6 h-6 text-primary" /> Verify {name}
+            </h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              That name is reserved. Enter its password to continue.
+            </p>
+            <Input
+              autoFocus
+              type="password"
+              value={verifyPw}
+              onChange={(e) => setVerifyPw(e.target.value)}
+              placeholder="Verification password"
+              className="h-12 mb-2"
+            />
+            {verifyError && <p className="text-destructive text-sm mb-2">{verifyError}</p>}
+            <div className="flex gap-3 mt-4">
+              <Button
+                type="button"
+                variant="ghost"
+                className="flex-1"
+                onClick={() => {
+                  setVerifyStage("name");
+                  setVerifyPw("");
+                  setVerifyError("");
+                }}
+              >
+                Back
+              </Button>
+              <Button type="submit" className="flex-1" disabled={checking || !verifyPw}>
+                {checking ? "Checking…" : "Verify →"}
+              </Button>
+            </div>
+          </form>
         ) : (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (name.trim() && language) onSetupComplete(name.trim(), language);
-            }}
-          >
+          <form onSubmit={handleSetupSubmit}>
             <h2 className="text-2xl font-bold mb-2">What's your name?</h2>
             <Input
               autoFocus
@@ -84,8 +145,8 @@ export function SecretGate({
                 </button>
               ))}
             </div>
-            <Button type="submit" disabled={!name.trim() || !language} className="w-full">
-              Enter chat →
+            <Button type="submit" disabled={!name.trim() || !language || checking} className="w-full">
+              {checking ? "Checking…" : "Enter chat →"}
             </Button>
           </form>
         )}
