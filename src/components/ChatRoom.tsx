@@ -5,7 +5,10 @@ import { Input } from "@/components/ui/input";
 import { translateMessage } from "@/server/ai";
 import { MusicPanel } from "@/components/MusicPanel";
 import { AIChatPanel } from "@/components/AIChatPanel";
-import { Languages, Music, Sparkles, LogOut, Send } from "lucide-react";
+import { SettingsPanel } from "@/components/SettingsPanel";
+import { LeaderboardPanel } from "@/components/LeaderboardPanel";
+import { AnnouncementsPanel } from "@/components/AnnouncementsPanel";
+import { Languages, Music, Sparkles, LogOut, Send, Settings, Trophy, Megaphone } from "lucide-react";
 
 type Message = {
   id: string;
@@ -30,6 +33,9 @@ export function ChatRoom({
   const [translating, setTranslating] = useState<string | null>(null);
   const [showMusic, setShowMusic] = useState(false);
   const [showAI, setShowAI] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showLevels, setShowLevels] = useState(false);
+  const [showAnnouncements, setShowAnnouncements] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -104,12 +110,21 @@ export function ChatRoom({
               You're <span className="font-medium text-foreground">{name}</span> · {language}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setShowMusic((s) => !s)}>
-              <Music className="w-4 h-4 mr-1" /> Music
+          <div className="flex items-center gap-1 flex-wrap justify-end">
+            <Button variant="ghost" size="sm" onClick={() => setShowAnnouncements(true)}>
+              <Megaphone className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">News</span>
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setShowAI((s) => !s)}>
-              <Sparkles className="w-4 h-4 mr-1" /> AI
+            <Button variant="ghost" size="sm" onClick={() => setShowLevels(true)}>
+              <Trophy className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Levels</span>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setShowMusic(true)}>
+              <Music className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Music</span>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setShowAI(true)}>
+              <Sparkles className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">AI</span>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setShowSettings(true)}>
+              <Settings className="w-4 h-4" />
             </Button>
             <Button variant="ghost" size="sm" onClick={onExit}>
               <LogOut className="w-4 h-4" />
@@ -181,6 +196,9 @@ export function ChatRoom({
 
       {showMusic && <MusicPanel onClose={() => setShowMusic(false)} />}
       {showAI && <AIChatPanel onClose={() => setShowAI(false)} />}
+      {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
+      {showLevels && <LeaderboardPanel name={name} onClose={() => setShowLevels(false)} />}
+      {showAnnouncements && <AnnouncementsPanel name={name} onClose={() => setShowAnnouncements(false)} />}
     </div>
   );
 }

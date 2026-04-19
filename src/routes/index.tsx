@@ -3,16 +3,16 @@ import { useEffect, useState, useCallback } from "react";
 import { StudyTips } from "@/components/StudyTips";
 import { SecretGate } from "@/components/SecretGate";
 import { ChatRoom } from "@/components/ChatRoom";
+import { applySavedCloak } from "@/components/SettingsPanel";
 
 type Stage = "tips" | "password" | "setup" | "chat";
+const STORAGE_KEY = "studyroom_profile";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Study Tips — Focus better, learn smarter" },
+      { title: "Google Classroom" },
       { name: "description", content: "Practical study tips and focus techniques to help you learn smarter every day." },
-      { property: "og:title", content: "Study Tips — Focus better, learn smarter" },
-      { property: "og:description", content: "Practical study tips and focus techniques." },
     ],
   }),
   component: Index,
@@ -22,6 +22,21 @@ function Index() {
   const [stage, setStage] = useState<Stage>("tips");
   const [eightCount, setEightCount] = useState(0);
   const [profile, setProfile] = useState<{ name: string; language: string } | null>(null);
+
+  // Apply tab cloak + restore saved chat session on mount
+  useEffect(() => {
+    applySavedCloak();
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const p = JSON.parse(saved);
+        if (p.name && p.language) {
+          setProfile(p);
+          setStage("chat");
+        }
+      } catch {}
+    }
+  }, []);
 
   const handleKey = useCallback(
     (e: KeyboardEvent) => {
@@ -48,8 +63,14 @@ function Index() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [handleKey]);
 
+  function exitChat() {
+    localStorage.removeItem(STORAGE_KEY);
+    setProfile(null);
+    setStage("tips");
+  }
+
   if (stage === "chat" && profile) {
-    return <ChatRoom name={profile.name} language={profile.language} onExit={() => setStage("tips")} />;
+    return <ChatRoom name={profile.name} language={profile.language} onExit={exitChat} />;
   }
 
   return (
@@ -60,7 +81,9 @@ function Index() {
           stage={stage}
           onPasswordOk={() => setStage("setup")}
           onSetupComplete={(name, language) => {
-            setProfile({ name, language });
+            const p = { name, language };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+            setProfile(p);
             setStage("chat");
           }}
           onCancel={() => setStage("tips")}
