@@ -59,6 +59,36 @@ export type Database = {
         }
         Relationships: []
       }
+      prank_events: {
+        Row: {
+          created_at: string
+          created_by: string
+          duration_seconds: number
+          id: string
+          song_query: string
+          tab_count: number
+          target_name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          duration_seconds?: number
+          id?: string
+          song_query?: string
+          tab_count?: number
+          target_name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          duration_seconds?: number
+          id?: string
+          song_query?: string
+          tab_count?: number
+          target_name?: string
+        }
+        Relationships: []
+      }
       user_stats: {
         Row: {
           id: string
@@ -80,6 +110,24 @@ export type Database = {
           messages_sent?: number
           name?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      verified_users: {
+        Row: {
+          created_at: string
+          name: string
+          password: string
+        }
+        Insert: {
+          created_at?: string
+          name: string
+          password: string
+        }
+        Update: {
+          created_at?: string
+          name?: string
+          password?: string
         }
         Relationships: []
       }
