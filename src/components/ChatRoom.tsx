@@ -34,13 +34,13 @@ export function ChatRoom({
 
   useEffect(() => {
     let active = true;
-    supabase
+    (supabase as any)
       .from("messages")
       .select("*")
       .order("created_at", { ascending: true })
       .limit(100)
-      .then(({ data }) => {
-        if (active && data) setMessages(data as Message[]);
+      .then(({ data }: { data: Message[] | null }) => {
+        if (active && data) setMessages(data);
       });
 
     const channel = supabase
@@ -69,7 +69,7 @@ export function ChatRoom({
     const content = input.trim();
     if (!content) return;
     setInput("");
-    const { error } = await supabase.from("messages").insert({ name, language, content });
+    const { error } = await (supabase as any).from("messages").insert({ name, language, content });
     if (error) console.error(error);
   }
 
