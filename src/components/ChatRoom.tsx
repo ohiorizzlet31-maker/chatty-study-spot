@@ -11,8 +11,11 @@ import { AnnouncementsPanel } from "@/components/AnnouncementsPanel";
 import { GamesPanel } from "@/components/GamesPanel";
 import { LogsPanel } from "@/components/LogsPanel";
 import { PrankWatcher } from "@/components/PrankWatcher";
-import { Languages, Music, Sparkles, LogOut, Send, Settings, Trophy, Megaphone, Gamepad2, FileText, BadgeCheck } from "lucide-react";
+import { DMPanel } from "@/components/DMPanel";
+import { ServersPanel } from "@/components/ServersPanel";
+import { Languages, Music, Sparkles, LogOut, Send, Settings, Trophy, Megaphone, Gamepad2, FileText, BadgeCheck, Crown, MessageSquare, Server as ServerIcon } from "lucide-react";
 import { loadVerified } from "@/lib/verified";
+import { isOwner } from "@/lib/device";
 import { getSettings, useSettingsListener, AppSettings } from "@/lib/settings";
 
 type Message = {
@@ -43,11 +46,16 @@ export function ChatRoom({
   const [showAnnouncements, setShowAnnouncements] = useState(false);
   const [showGames, setShowGames] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
+  const [showDMs, setShowDMs] = useState(false);
+  const [showServers, setShowServers] = useState(false);
+  const [dmPeer, setDmPeer] = useState<string | null>(null);
+  const [nameMenu, setNameMenu] = useState<string | null>(null);
   const [verifiedNames, setVerifiedNames] = useState<Set<string>>(new Set());
   const [settings, setSettings] = useState<AppSettings>(getSettings());
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const isVerified = verifiedNames.has(name.toLowerCase());
+  const owner = isOwner(name);
 
   useEffect(() => {
     loadVerified().then((rows) => {
@@ -153,11 +161,18 @@ export function ChatRoom({
             <p className="text-xs text-muted-foreground truncate">
               You're <span className="font-medium text-foreground inline-flex items-center gap-1">
                 {settings.hideName ? "Anonymous" : name}
+                {owner && !settings.hideName && <Crown className="w-3.5 h-3.5 text-yellow-500" />}
                 {isVerified && !settings.hideName && <BadgeCheck className="w-3.5 h-3.5 text-primary" />}
               </span> · {language}
             </p>
           </div>
           <div className="flex items-center gap-1 flex-wrap justify-end">
+            <Button variant="ghost" size="sm" onClick={() => setShowServers(true)}>
+              <ServerIcon className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Servers</span>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => { setDmPeer(null); setShowDMs(true); }}>
+              <MessageSquare className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">DMs</span>
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => setShowAnnouncements(true)}>
               <Megaphone className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">News</span>
             </Button>
@@ -196,15 +211,37 @@ export function ChatRoom({
           {messages.map((m) => {
             const mine = m.name === (settings.hideName ? "Anonymous" : name);
             const verified = verifiedNames.has(m.name.toLowerCase());
+            const ownerMsg = isOwner(m.name);
+            const menuOpen = nameMenu === m.id;
             return (
               <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[80%] ${mine ? "items-end" : "items-start"} flex flex-col gap-1`}>
-                  <div className="text-xs text-muted-foreground px-2 flex items-center gap-1">
-                    <span className="font-medium text-foreground/80">{m.name}</span>
-                    {verified && <BadgeCheck className="w-3 h-3 text-primary" />}
+                  <div className="text-xs text-muted-foreground px-2 flex items-center gap-1 relative">
+                    <button
+                      onClick={() => setNameMenu(menuOpen ? null : m.id)}
+                      className="font-medium text-foreground/80 hover:text-primary inline-flex items-center gap-1"
+                    >
+                      {m.name}
+                      {ownerMsg && <Crown className="w-3 h-3 text-yellow-500" />}
+                      {verified && <BadgeCheck className="w-3 h-3 text-primary" />}
+                    </button>
                     <span className="opacity-60">· {m.language}</span>
                     {!settings.hideTimestamps && (
                       <span className="opacity-60">· {fmtTime(m.created_at)}</span>
+                    )}
+                    {menuOpen && !mine && m.name !== "Anonymous" && (
+                      <div className="absolute top-full left-0 mt-1 z-20 bg-popover border border-border rounded-lg shadow-lg p-1 min-w-[120px]">
+                        <button
+                          onClick={() => {
+                            setDmPeer(m.name);
+                            setShowDMs(true);
+                            setNameMenu(null);
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-muted flex items-center gap-2"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" /> DM {m.name}
+                        </button>
+                      </div>
                     )}
                   </div>
                   <div
@@ -264,6 +301,22 @@ export function ChatRoom({
       {showAnnouncements && <AnnouncementsPanel name={name} onClose={() => setShowAnnouncements(false)} />}
       {showGames && <GamesPanel onClose={() => setShowGames(false)} />}
       {showLogs && isVerified && <LogsPanel name={name} onClose={() => setShowLogs(false)} />}
+      {showDMs && (
+        <DMPanel
+          name={name}
+          language={language}
+          initialPeer={dmPeer}
+          verifiedNames={verifiedNames}
+          onClose={() => setShowDMs(false)}
+        />
+      )}
+      {showServers && (
+        <ServersPanel
+          name={name}
+          verifiedNames={verifiedNames}
+          onClose={() => setShowServers(false)}
+        />
+      )}
     </div>
   );
 }

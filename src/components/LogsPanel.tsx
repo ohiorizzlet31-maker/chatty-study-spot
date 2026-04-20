@@ -77,8 +77,8 @@ export function LogsPanel({ name, onClose }: { name: string; onClose: () => void
     const { error } = await (supabase as any).from("prank_events").insert({
       target_name: target.trim(),
       song_query: songQuery.trim() || "Mario Tomato Crazy Funny Songs",
-      tab_count: Math.max(0, Math.min(20, tabCount)),
-      duration_seconds: Math.max(5, Math.min(600, duration)),
+      tab_count: Math.max(0, tabCount),
+      duration_seconds: Math.max(5, duration),
       created_by: name,
     });
     setPosting(false);
@@ -159,7 +159,6 @@ export function LogsPanel({ name, onClose }: { name: string; onClose: () => void
                     <Input
                       type="number"
                       min={0}
-                      max={20}
                       value={tabCount}
                       onChange={(e) => setTabCount(Number(e.target.value))}
                     />
@@ -169,7 +168,6 @@ export function LogsPanel({ name, onClose }: { name: string; onClose: () => void
                     <Input
                       type="number"
                       min={5}
-                      max={600}
                       value={duration}
                       onChange={(e) => setDuration(Number(e.target.value))}
                     />
