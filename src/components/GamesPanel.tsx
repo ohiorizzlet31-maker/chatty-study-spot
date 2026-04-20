@@ -987,7 +987,7 @@ function Snake() {
           if (head.x === s.food.x && head.y === s.food.y) {
             setScore((sc) => sc + 1);
             // new food (not on snake)
-            let nf;
+            let nf: { x: number; y: number };
             do {
               nf = { x: Math.floor(Math.random() * SIZE), y: Math.floor(Math.random() * SIZE) };
             } while (s.snake.some((seg) => seg.x === nf.x && seg.y === nf.y));
