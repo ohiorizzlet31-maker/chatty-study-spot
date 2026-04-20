@@ -211,15 +211,37 @@ export function ChatRoom({
           {messages.map((m) => {
             const mine = m.name === (settings.hideName ? "Anonymous" : name);
             const verified = verifiedNames.has(m.name.toLowerCase());
+            const ownerMsg = isOwner(m.name);
+            const menuOpen = nameMenu === m.id;
             return (
               <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[80%] ${mine ? "items-end" : "items-start"} flex flex-col gap-1`}>
-                  <div className="text-xs text-muted-foreground px-2 flex items-center gap-1">
-                    <span className="font-medium text-foreground/80">{m.name}</span>
-                    {verified && <BadgeCheck className="w-3 h-3 text-primary" />}
+                  <div className="text-xs text-muted-foreground px-2 flex items-center gap-1 relative">
+                    <button
+                      onClick={() => setNameMenu(menuOpen ? null : m.id)}
+                      className="font-medium text-foreground/80 hover:text-primary inline-flex items-center gap-1"
+                    >
+                      {m.name}
+                      {ownerMsg && <Crown className="w-3 h-3 text-yellow-500" />}
+                      {verified && <BadgeCheck className="w-3 h-3 text-primary" />}
+                    </button>
                     <span className="opacity-60">· {m.language}</span>
                     {!settings.hideTimestamps && (
                       <span className="opacity-60">· {fmtTime(m.created_at)}</span>
+                    )}
+                    {menuOpen && !mine && m.name !== "Anonymous" && (
+                      <div className="absolute top-full left-0 mt-1 z-20 bg-popover border border-border rounded-lg shadow-lg p-1 min-w-[120px]">
+                        <button
+                          onClick={() => {
+                            setDmPeer(m.name);
+                            setShowDMs(true);
+                            setNameMenu(null);
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-muted flex items-center gap-2"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" /> DM {m.name}
+                        </button>
+                      </div>
                     )}
                   </div>
                   <div
