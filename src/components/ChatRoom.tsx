@@ -157,7 +157,7 @@ export function ChatRoom({
       <header className="border-b border-border bg-card/80 backdrop-blur sticky top-0 z-10">
         <div className="container mx-auto max-w-4xl px-4 py-3 flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <h1 className="font-display text-xl font-bold">studyroom · chat</h1>
+            <h1 className="font-display text-xl font-bold">Damian Hub</h1>
             <p className="text-xs text-muted-foreground truncate">
               You're <span className="font-medium text-foreground inline-flex items-center gap-1">
                 {settings.hideName ? "Anonymous" : name}

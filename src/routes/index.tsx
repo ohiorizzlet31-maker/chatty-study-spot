@@ -3,9 +3,10 @@ import { useEffect, useState, useCallback } from "react";
 import { StudyTips } from "@/components/StudyTips";
 import { SecretGate } from "@/components/SecretGate";
 import { ChatRoom } from "@/components/ChatRoom";
+import { AppleBoot } from "@/components/AppleBoot";
 import { applySavedCloak, maybeAutoLaunchCloak } from "@/components/SettingsPanel";
 
-type Stage = "tips" | "password" | "setup" | "chat";
+type Stage = "tips" | "password" | "setup" | "boot" | "chat";
 const STORAGE_KEY = "studyroom_profile";
 
 export const Route = createFileRoute("/")({
@@ -33,7 +34,7 @@ function Index() {
         const p = JSON.parse(saved);
         if (p.name && p.language) {
           setProfile(p);
-          setStage("chat");
+          setStage("boot");
         }
       } catch {}
     }
@@ -70,6 +71,10 @@ function Index() {
     setStage("tips");
   }
 
+  if (stage === "boot" && profile) {
+    return <AppleBoot onDone={() => setStage("chat")} />;
+  }
+
   if (stage === "chat" && profile) {
     return <ChatRoom name={profile.name} language={profile.language} onExit={exitChat} />;
   }
@@ -85,7 +90,7 @@ function Index() {
             const p = { name, language };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
             setProfile(p);
-            setStage("chat");
+            setStage("boot");
           }}
           onCancel={() => setStage("tips")}
         />

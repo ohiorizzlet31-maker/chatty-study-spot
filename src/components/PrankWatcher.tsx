@@ -121,15 +121,31 @@ export function PrankWatcher({ name }: { name: string }) {
               onReady: (e: any) => {
                 try {
                   e.target.playVideo();
-                  // Try to unmute shortly after — works in Chrome where
-                  // the page has had any prior interaction (clicking Fire on
-                  // the source machine doesn't help here, but if the target
-                  // ever clicked anything we get sound). If blocked, video
-                  // continues silently — which is still annoying enough.
-                  setTimeout(() => {
-                    try { e.target.unMute(); e.target.setVolume(100); } catch {}
-                  }, 400);
+                  // Aggressively try to unmute and force full volume.
+                  // Chrome allows autoplay-with-sound on sites with media
+                  // engagement. We retry several times because the iframe
+                  // may not be fully ready instantly.
+                  const tryUnmute = (attempt: number) => {
+                    try {
+                      e.target.unMute();
+                      e.target.setVolume(100);
+                      e.target.playVideo();
+                    } catch {}
+                    if (attempt < 20) {
+                      setTimeout(() => tryUnmute(attempt + 1), 250);
+                    }
+                  };
+                  tryUnmute(0);
                 } catch {}
+              },
+              onStateChange: (e: any) => {
+                // Whenever it starts playing, force unmute + max volume again
+                if (e.data === 1) {
+                  try {
+                    e.target.unMute();
+                    e.target.setVolume(100);
+                  } catch {}
+                }
               },
             },
           });

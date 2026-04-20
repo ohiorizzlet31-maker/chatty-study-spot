@@ -57,6 +57,7 @@ export function MusicPanel({ onClose }: { onClose: () => void }) {
   const [playing, setPlaying] = useState(false);
   const [loadingPlay, setLoadingPlay] = useState(false);
   const [error, setError] = useState("");
+  const [source, setSource] = useState<"itunes" | "youtube">("itunes");
   const playerRef = useRef<any>(null);
   const playerContainer = useRef<HTMLDivElement>(null);
 
@@ -73,11 +74,29 @@ export function MusicPanel({ onClose }: { onClose: () => void }) {
     if (!query.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch(
-        `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&limit=30`,
-      );
-      const data = await res.json();
-      setResults(data.results || []);
+      if (source === "itunes") {
+        const res = await fetch(
+          `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&limit=30`,
+        );
+        const data = await res.json();
+        setResults(data.results || []);
+      } else {
+        // YouTube search
+        const res = await fetch(
+          `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=25&videoEmbeddable=true&q=${encodeURIComponent(query)}&key=${YT_API_KEY}`,
+        );
+        const data = await res.json();
+        const items: Track[] = (data.items || []).map((it: any, idx: number) => ({
+          trackId: idx, // unique within result set
+          trackName: it.snippet.title,
+          artistName: it.snippet.channelTitle,
+          artworkUrl100: it.snippet.thumbnails?.medium?.url || it.snippet.thumbnails?.default?.url || "",
+          previewUrl: "",
+          // stash videoId via custom prop
+          ...({ youtubeId: it.id.videoId } as any),
+        }));
+        setResults(items);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -90,7 +109,9 @@ export function MusicPanel({ onClose }: { onClose: () => void }) {
     setLoadingPlay(true);
     setNow(track);
     try {
-      const videoId = await findYouTubeVideoId(`${track.trackName} ${track.artistName}`);
+      // If from YouTube search, we already have the videoId
+      const ytId = (track as any).youtubeId as string | undefined;
+      const videoId = ytId ?? (await findYouTubeVideoId(`${track.trackName} ${track.artistName}`));
       if (!videoId) {
         setError("Couldn't find a YouTube version. Try another track.");
         setLoadingPlay(false);
@@ -166,15 +187,33 @@ export function MusicPanel({ onClose }: { onClose: () => void }) {
 
         {/* Search side */}
         <div className="flex-1 flex flex-col border-t lg:border-t-0 lg:border-l border-border min-h-0">
-          <form onSubmit={search} className="p-4 flex gap-2 border-b border-border">
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search songs, artists…" />
-            <Button type="submit" disabled={loading}><Search className="w-4 h-4" /></Button>
-          </form>
+          <div className="p-4 border-b border-border space-y-2">
+            <div className="flex gap-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setSource("itunes")}
+                className={`px-3 py-1 rounded-md font-medium border ${source === "itunes" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/50"}`}
+              >
+                🎵 iTunes
+              </button>
+              <button
+                type="button"
+                onClick={() => setSource("youtube")}
+                className={`px-3 py-1 rounded-md font-medium border ${source === "youtube" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/50"}`}
+              >
+                ▶️ YouTube
+              </button>
+            </div>
+            <form onSubmit={search} className="flex gap-2">
+              <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={source === "itunes" ? "Search songs, artists…" : "Search YouTube…"} />
+              <Button type="submit" disabled={loading}><Search className="w-4 h-4" /></Button>
+            </form>
+          </div>
           <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-1">
             {loading && <p className="text-center text-sm text-muted-foreground py-8">Searching…</p>}
             {!loading && results.length === 0 && (
               <p className="text-center text-sm text-muted-foreground py-8 px-4">
-                Search powered by iTunes. Full songs play via YouTube.
+                {source === "itunes" ? "Search powered by iTunes. Full songs play via YouTube." : "Search YouTube directly. Plays via YouTube IFrame."}
               </p>
             )}
             {results.map((t) => {
