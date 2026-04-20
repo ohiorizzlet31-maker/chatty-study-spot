@@ -301,6 +301,22 @@ export function ChatRoom({
       {showAnnouncements && <AnnouncementsPanel name={name} onClose={() => setShowAnnouncements(false)} />}
       {showGames && <GamesPanel onClose={() => setShowGames(false)} />}
       {showLogs && isVerified && <LogsPanel name={name} onClose={() => setShowLogs(false)} />}
+      {showDMs && (
+        <DMPanel
+          name={name}
+          language={language}
+          initialPeer={dmPeer}
+          verifiedNames={verifiedNames}
+          onClose={() => setShowDMs(false)}
+        />
+      )}
+      {showServers && (
+        <ServersPanel
+          name={name}
+          verifiedNames={verifiedNames}
+          onClose={() => setShowServers(false)}
+        />
+      )}
     </div>
   );
 }
