@@ -35,6 +35,36 @@ export type Database = {
         }
         Relationships: []
       }
+      dm_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          language: string
+          recipient_name: string
+          sender_device: string
+          sender_name: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          language?: string
+          recipient_name: string
+          sender_device: string
+          sender_name: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          language?: string
+          recipient_name?: string
+          sender_device?: string
+          sender_name?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           content: string
@@ -86,6 +116,135 @@ export type Database = {
           song_query?: string
           tab_count?: number
           target_name?: string
+        }
+        Relationships: []
+      }
+      server_channels: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          position: number
+          read_role: string
+          server_id: string
+          write_role: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          position?: number
+          read_role?: string
+          server_id: string
+          write_role?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          position?: number
+          read_role?: string
+          server_id?: string
+          write_role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "server_channels_server_id_fkey"
+            columns: ["server_id"]
+            isOneToOne: false
+            referencedRelation: "servers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      server_members: {
+        Row: {
+          id: string
+          joined_at: string
+          member_name: string
+          role: string
+          server_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string
+          member_name: string
+          role?: string
+          server_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string
+          member_name?: string
+          role?: string
+          server_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "server_members_server_id_fkey"
+            columns: ["server_id"]
+            isOneToOne: false
+            referencedRelation: "servers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      server_messages: {
+        Row: {
+          author_name: string
+          channel_id: string
+          content: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          author_name: string
+          channel_id: string
+          content: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          author_name?: string
+          channel_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "server_messages_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "server_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      servers: {
+        Row: {
+          created_at: string
+          id: string
+          invite_code: string
+          name: string
+          owner_name: string
+          visibility: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invite_code?: string
+          name: string
+          owner_name: string
+          visibility?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invite_code?: string
+          name?: string
+          owner_name?: string
+          visibility?: string
         }
         Relationships: []
       }
