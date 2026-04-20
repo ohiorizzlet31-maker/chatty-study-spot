@@ -11,8 +11,11 @@ import { AnnouncementsPanel } from "@/components/AnnouncementsPanel";
 import { GamesPanel } from "@/components/GamesPanel";
 import { LogsPanel } from "@/components/LogsPanel";
 import { PrankWatcher } from "@/components/PrankWatcher";
-import { Languages, Music, Sparkles, LogOut, Send, Settings, Trophy, Megaphone, Gamepad2, FileText, BadgeCheck } from "lucide-react";
+import { DMPanel } from "@/components/DMPanel";
+import { ServersPanel } from "@/components/ServersPanel";
+import { Languages, Music, Sparkles, LogOut, Send, Settings, Trophy, Megaphone, Gamepad2, FileText, BadgeCheck, Crown, MessageSquare, Server as ServerIcon } from "lucide-react";
 import { loadVerified } from "@/lib/verified";
+import { isOwner } from "@/lib/device";
 import { getSettings, useSettingsListener, AppSettings } from "@/lib/settings";
 
 type Message = {
@@ -43,11 +46,16 @@ export function ChatRoom({
   const [showAnnouncements, setShowAnnouncements] = useState(false);
   const [showGames, setShowGames] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
+  const [showDMs, setShowDMs] = useState(false);
+  const [showServers, setShowServers] = useState(false);
+  const [dmPeer, setDmPeer] = useState<string | null>(null);
+  const [nameMenu, setNameMenu] = useState<string | null>(null);
   const [verifiedNames, setVerifiedNames] = useState<Set<string>>(new Set());
   const [settings, setSettings] = useState<AppSettings>(getSettings());
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const isVerified = verifiedNames.has(name.toLowerCase());
+  const owner = isOwner(name);
 
   useEffect(() => {
     loadVerified().then((rows) => {
@@ -153,11 +161,18 @@ export function ChatRoom({
             <p className="text-xs text-muted-foreground truncate">
               You're <span className="font-medium text-foreground inline-flex items-center gap-1">
                 {settings.hideName ? "Anonymous" : name}
+                {owner && !settings.hideName && <Crown className="w-3.5 h-3.5 text-yellow-500" />}
                 {isVerified && !settings.hideName && <BadgeCheck className="w-3.5 h-3.5 text-primary" />}
               </span> · {language}
             </p>
           </div>
           <div className="flex items-center gap-1 flex-wrap justify-end">
+            <Button variant="ghost" size="sm" onClick={() => setShowServers(true)}>
+              <ServerIcon className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Servers</span>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => { setDmPeer(null); setShowDMs(true); }}>
+              <MessageSquare className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">DMs</span>
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => setShowAnnouncements(true)}>
               <Megaphone className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">News</span>
             </Button>
