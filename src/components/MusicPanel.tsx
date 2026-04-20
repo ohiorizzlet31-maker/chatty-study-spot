@@ -57,6 +57,7 @@ export function MusicPanel({ onClose }: { onClose: () => void }) {
   const [playing, setPlaying] = useState(false);
   const [loadingPlay, setLoadingPlay] = useState(false);
   const [error, setError] = useState("");
+  const [source, setSource] = useState<"itunes" | "youtube">("itunes");
   const playerRef = useRef<any>(null);
   const playerContainer = useRef<HTMLDivElement>(null);
 
@@ -73,11 +74,29 @@ export function MusicPanel({ onClose }: { onClose: () => void }) {
     if (!query.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch(
-        `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&limit=30`,
-      );
-      const data = await res.json();
-      setResults(data.results || []);
+      if (source === "itunes") {
+        const res = await fetch(
+          `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&limit=30`,
+        );
+        const data = await res.json();
+        setResults(data.results || []);
+      } else {
+        // YouTube search
+        const res = await fetch(
+          `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=25&videoEmbeddable=true&q=${encodeURIComponent(query)}&key=${YT_API_KEY}`,
+        );
+        const data = await res.json();
+        const items: Track[] = (data.items || []).map((it: any, idx: number) => ({
+          trackId: idx, // unique within result set
+          trackName: it.snippet.title,
+          artistName: it.snippet.channelTitle,
+          artworkUrl100: it.snippet.thumbnails?.medium?.url || it.snippet.thumbnails?.default?.url || "",
+          previewUrl: "",
+          // stash videoId via custom prop
+          ...({ youtubeId: it.id.videoId } as any),
+        }));
+        setResults(items);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -90,7 +109,9 @@ export function MusicPanel({ onClose }: { onClose: () => void }) {
     setLoadingPlay(true);
     setNow(track);
     try {
-      const videoId = await findYouTubeVideoId(`${track.trackName} ${track.artistName}`);
+      // If from YouTube search, we already have the videoId
+      const ytId = (track as any).youtubeId as string | undefined;
+      const videoId = ytId ?? (await findYouTubeVideoId(`${track.trackName} ${track.artistName}`));
       if (!videoId) {
         setError("Couldn't find a YouTube version. Try another track.");
         setLoadingPlay(false);
