@@ -187,15 +187,33 @@ export function MusicPanel({ onClose }: { onClose: () => void }) {
 
         {/* Search side */}
         <div className="flex-1 flex flex-col border-t lg:border-t-0 lg:border-l border-border min-h-0">
-          <form onSubmit={search} className="p-4 flex gap-2 border-b border-border">
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search songs, artists…" />
-            <Button type="submit" disabled={loading}><Search className="w-4 h-4" /></Button>
-          </form>
+          <div className="p-4 border-b border-border space-y-2">
+            <div className="flex gap-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setSource("itunes")}
+                className={`px-3 py-1 rounded-md font-medium border ${source === "itunes" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/50"}`}
+              >
+                🎵 iTunes
+              </button>
+              <button
+                type="button"
+                onClick={() => setSource("youtube")}
+                className={`px-3 py-1 rounded-md font-medium border ${source === "youtube" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/50"}`}
+              >
+                ▶️ YouTube
+              </button>
+            </div>
+            <form onSubmit={search} className="flex gap-2">
+              <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={source === "itunes" ? "Search songs, artists…" : "Search YouTube…"} />
+              <Button type="submit" disabled={loading}><Search className="w-4 h-4" /></Button>
+            </form>
+          </div>
           <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-1">
             {loading && <p className="text-center text-sm text-muted-foreground py-8">Searching…</p>}
             {!loading && results.length === 0 && (
               <p className="text-center text-sm text-muted-foreground py-8 px-4">
-                Search powered by iTunes. Full songs play via YouTube.
+                {source === "itunes" ? "Search powered by iTunes. Full songs play via YouTube." : "Search YouTube directly. Plays via YouTube IFrame."}
               </p>
             )}
             {results.map((t) => {
