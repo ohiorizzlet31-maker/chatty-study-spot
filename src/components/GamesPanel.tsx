@@ -673,12 +673,14 @@ function slide(g: number[][], dir: "up" | "down" | "left" | "right") {
   for (let i = 0; i < rotations; i++) rotated = rotateCW(rotated);
   let gained = 0;
   let moved = false;
-  const next = rotated.map((row) => {
+  const mergePositions: Array<[number, number]> = [];
+  const next = rotated.map((row, rowIdx) => {
     const filtered = row.filter((v) => v !== 0);
     for (let i = 0; i < filtered.length - 1; i++) {
       if (filtered[i] === filtered[i + 1]) {
         filtered[i] *= 2;
         gained += filtered[i];
+        mergePositions.push([rowIdx, i]);
         filtered.splice(i + 1, 1);
       }
     }
@@ -688,7 +690,18 @@ function slide(g: number[][], dir: "up" | "down" | "left" | "right") {
   });
   let unrotated = next;
   for (let i = 0; i < (4 - rotations) % 4; i++) unrotated = rotateCW(unrotated);
-  return { grid: unrotated, gained, moved };
+  // Transform merge positions back to original orientation
+  const merges = new Set<string>();
+  for (const [r, c] of mergePositions) {
+    let pr = r, pc = c;
+    for (let i = 0; i < (4 - rotations) % 4; i++) {
+      const tmp = pc;
+      pc = n - 1 - pr;
+      pr = tmp;
+    }
+    merges.add(`${pr}-${pc}`);
+  }
+  return { grid: unrotated, gained, moved, merges };
 }
 function rotateCW(g: number[][]) {
   const n = g.length;
