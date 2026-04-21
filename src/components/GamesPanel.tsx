@@ -503,25 +503,41 @@ function drawPipe(ctx: CanvasRenderingContext2D, x: number, y: number, w: number
 /* ---------------- 2048 ---------------- */
 
 function Game2048() {
-  const SIZE = 4;
-  const [grid, setGrid] = useState<number[][]>(() => addRandom(addRandom(emptyGrid(SIZE))));
+  const [sizeInput, setSizeInput] = useState("4");
+  const [size, setSize] = useState(4);
+  const [grid, setGrid] = useState<number[][]>(() => addRandom(addRandom(emptyGrid(4))));
   const [score, setScore] = useState(0);
   const [best, setBest] = useState(() => Number(localStorage.getItem("2048_best") || 0));
   const [over, setOver] = useState(false);
   const [won, setWon] = useState(false);
+  const [newTiles, setNewTiles] = useState<Set<string>>(new Set());
+  const [mergedTiles, setMergedTiles] = useState<Set<string>>(new Set());
 
-  function reset() {
-    setGrid(addRandom(addRandom(emptyGrid(SIZE))));
+  function reset(n?: number) {
+    const s = n ?? size;
+    setGrid(addRandom(addRandom(emptyGrid(s))));
     setScore(0);
     setOver(false);
     setWon(false);
+    setNewTiles(new Set());
+    setMergedTiles(new Set());
   }
 
   function move(dir: "up" | "down" | "left" | "right") {
     if (over) return;
-    const { grid: ng, gained, moved } = slide(grid, dir);
+    const { grid: ng, gained, moved, merges } = slide(grid, dir);
     if (!moved) return;
     const withTile = addRandom(ng);
+    // Find new tile position
+    const nt = new Set<string>();
+    for (let r = 0; r < withTile.length; r++) {
+      for (let c = 0; c < withTile[r].length; c++) {
+        if (withTile[r][c] !== 0 && ng[r][c] === 0) nt.add(`${r}-${c}`);
+      }
+    }
+    setNewTiles(nt);
+    setMergedTiles(merges);
+    setTimeout(() => { setNewTiles(new Set()); setMergedTiles(new Set()); }, 200);
     setGrid(withTile);
     setScore((s) => {
       const ns = s + gained;
@@ -533,6 +549,13 @@ function Game2048() {
     });
     if (withTile.flat().includes(2048) && !won) setWon(true);
     if (!hasMoves(withTile)) setOver(true);
+  }
+
+  function applySize() {
+    const n = Math.max(2, Math.min(10, parseInt(sizeInput) || 4));
+    setSizeInput(String(n));
+    setSize(n);
+    reset(n);
   }
 
   useEffect(() => {
@@ -585,25 +608,44 @@ function Game2048() {
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <div className="flex gap-4 items-center text-sm w-full max-w-xs justify-between">
+      <div className="flex gap-3 items-center text-sm w-full max-w-sm justify-between flex-wrap">
         <div><span className="text-muted-foreground">Score</span> <span className="font-bold">{score}</span></div>
         <div><span className="text-muted-foreground">Best</span> <span className="font-bold">{best}</span></div>
-        <Button onClick={reset} variant="outline" size="sm">New</Button>
+        <div className="flex items-center gap-1">
+          <input
+            value={sizeInput}
+            onChange={(e) => setSizeInput(e.target.value)}
+            onBlur={applySize}
+            onKeyDown={(e) => { if (e.key === "Enter") applySize(); }}
+            className="w-10 h-8 text-center rounded border border-border bg-muted/30 text-sm"
+            maxLength={2}
+          />
+          <span className="text-xs text-muted-foreground">×{sizeInput}</span>
+        </div>
+        <Button onClick={() => reset()} variant="outline" size="sm">New</Button>
       </div>
       <div
-        className="grid grid-cols-4 gap-2 p-2 rounded-xl bg-muted/40 touch-none select-none"
-        style={{ width: "min(360px, 100%)" }}
+        className="grid gap-1.5 p-2 rounded-xl bg-muted/40 touch-none select-none"
+        style={{ width: "min(360px, 100%)", gridTemplateColumns: `repeat(${size}, 1fr)` }}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
-        {grid.flat().map((v, i) => (
-          <div
-            key={i}
-            className={`aspect-square rounded-lg flex items-center justify-center font-bold text-xl ${tileColors[v] ?? "bg-emerald-700 text-white"}`}
-          >
-            {v || ""}
-          </div>
-        ))}
+        {grid.flat().map((v, i) => {
+          const r = Math.floor(i / size);
+          const c = i % size;
+          const key = `${r}-${c}`;
+          const isNew = newTiles.has(key);
+          const isMerged = mergedTiles.has(key);
+          const fontSize = size <= 4 ? "text-xl" : size <= 6 ? "text-sm" : "text-xs";
+          return (
+            <div
+              key={i}
+              className={`aspect-square rounded-lg flex items-center justify-center font-bold ${fontSize} ${tileColors[v] ?? "bg-emerald-700 text-white"} transition-transform duration-150 ${isNew ? "animate-[scaleIn_0.15s_ease-out]" : ""} ${isMerged ? "animate-[pop_0.2s_ease-out]" : ""}`}
+            >
+              {v || ""}
+            </div>
+          );
+        })}
       </div>
       {(won || over) && (
         <p className="text-sm font-semibold">{won ? "🎉 You hit 2048!" : "No more moves."}</p>
