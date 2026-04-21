@@ -5,8 +5,9 @@ import { SecretGate } from "@/components/SecretGate";
 import { ChatRoom } from "@/components/ChatRoom";
 import { AppleBoot } from "@/components/AppleBoot";
 import { applySavedCloak, maybeAutoLaunchCloak } from "@/components/SettingsPanel";
+import { getSettings, useSettingsListener } from "@/lib/settings";
 
-type Stage = "tips" | "password" | "setup" | "boot" | "chat";
+type Stage = "tips" | "password" | "setup" | "boot" | "chat" | "panic";
 const STORAGE_KEY = "studyroom_profile";
 
 export const Route = createFileRoute("/")({
@@ -23,6 +24,8 @@ function Index() {
   const [stage, setStage] = useState<Stage>("tips");
   const [eightCount, setEightCount] = useState(0);
   const [profile, setProfile] = useState<{ name: string; language: string } | null>(null);
+  const [prePanicStage, setPrePanicStage] = useState<Stage>("chat");
+  const [panicKey, setPanicKey] = useState(getSettings().panicKey || "`");
 
   // Apply tab cloak + restore saved chat session on mount
   useEffect(() => {
@@ -38,7 +41,29 @@ function Index() {
         }
       } catch {}
     }
+    return useSettingsListener((s) => setPanicKey(s.panicKey || "`"));
   }, []);
+
+  // Panic key listener
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      const key = e.key === " " ? "Space" : e.key;
+      if (key !== panicKey) return;
+      e.preventDefault();
+      setStage((cur) => {
+        if (cur === "panic") return prePanicStage;
+        if (cur === "chat" || cur === "boot") {
+          setPrePanicStage(cur);
+          return "panic";
+        }
+        return cur;
+      });
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [panicKey, prePanicStage]);
 
   const handleKey = useCallback(
     (e: KeyboardEvent) => {
@@ -69,6 +94,10 @@ function Index() {
     localStorage.removeItem(STORAGE_KEY);
     setProfile(null);
     setStage("tips");
+  }
+
+  if (stage === "panic") {
+    return <StudyTips eightCount={0} />;
   }
 
   if (stage === "boot" && profile) {

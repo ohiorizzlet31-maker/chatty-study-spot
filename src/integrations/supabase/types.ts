@@ -35,6 +35,30 @@ export type Database = {
         }
         Relationships: []
       }
+      bookmarklets: {
+        Row: {
+          author: string
+          code: string
+          created_at: string
+          id: string
+          title: string
+        }
+        Insert: {
+          author: string
+          code: string
+          created_at?: string
+          id?: string
+          title: string
+        }
+        Update: {
+          author?: string
+          code?: string
+          created_at?: string
+          id?: string
+          title?: string
+        }
+        Relationships: []
+      }
       dm_messages: {
         Row: {
           content: string

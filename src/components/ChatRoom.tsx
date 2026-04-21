@@ -13,7 +13,9 @@ import { LogsPanel } from "@/components/LogsPanel";
 import { PrankWatcher } from "@/components/PrankWatcher";
 import { DMPanel } from "@/components/DMPanel";
 import { ServersPanel } from "@/components/ServersPanel";
-import { Languages, Music, Sparkles, LogOut, Send, Settings, Trophy, Megaphone, Gamepad2, FileText, BadgeCheck, Crown, MessageSquare, Server as ServerIcon } from "lucide-react";
+import { BookmarkletsPanel } from "@/components/BookmarkletsPanel";
+import { HtmlRunnerPanel } from "@/components/HtmlRunnerPanel";
+import { Languages, Music, Sparkles, LogOut, Send, Settings, Trophy, Megaphone, Gamepad2, FileText, BadgeCheck, Crown, MessageSquare, Server as ServerIcon, Bookmark, Code } from "lucide-react";
 import { loadVerified } from "@/lib/verified";
 import { isOwner } from "@/lib/device";
 import { getSettings, useSettingsListener, AppSettings } from "@/lib/settings";
@@ -48,6 +50,8 @@ export function ChatRoom({
   const [showLogs, setShowLogs] = useState(false);
   const [showDMs, setShowDMs] = useState(false);
   const [showServers, setShowServers] = useState(false);
+  const [showBookmarklets, setShowBookmarklets] = useState(false);
+  const [showHtmlRunner, setShowHtmlRunner] = useState(false);
   const [dmPeer, setDmPeer] = useState<string | null>(null);
   const [nameMenu, setNameMenu] = useState<string | null>(null);
   const [verifiedNames, setVerifiedNames] = useState<Set<string>>(new Set());
@@ -188,6 +192,12 @@ export function ChatRoom({
             <Button variant="ghost" size="sm" onClick={() => setShowAI(true)}>
               <Sparkles className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">AI</span>
             </Button>
+            <Button variant="ghost" size="sm" onClick={() => setShowBookmarklets(true)}>
+              <Bookmark className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Bookmarklets</span>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setShowHtmlRunner(true)}>
+              <Code className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">HTML</span>
+            </Button>
             {isVerified && (
               <Button variant="ghost" size="sm" onClick={() => setShowLogs(true)}>
                 <FileText className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Logs</span>
@@ -317,6 +327,8 @@ export function ChatRoom({
           onClose={() => setShowServers(false)}
         />
       )}
+      {showBookmarklets && <BookmarkletsPanel name={name} onClose={() => setShowBookmarklets(false)} />}
+      {showHtmlRunner && <HtmlRunnerPanel onClose={() => setShowHtmlRunner(false)} />}
     </div>
   );
 }
