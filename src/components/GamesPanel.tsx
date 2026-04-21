@@ -210,15 +210,16 @@ function FlappyBird() {
   const runningRef = useRef(false);
   const overRef = useRef(false);
   const [, force] = useState(0);
+  const scoreRef = useRef(0);
 
   const W = 360;
   const H = 540;
-  const GRAVITY = 0.35;
-  const FLAP = -6.5;
+  const GRAVITY = 1500;
+  const FLAP = -360;
   const PIPE_W = 60;
-  const PIPE_GAP = 135;
-  const PIPE_SPACING = 100; // frames between pipe spawns
-  const SPEED = 2.2;
+  const PIPE_GAP = 150;
+  const PIPE_SPACING = 1.55;
+  const SPEED = 130;
   const GROUND_H = 80;
   const BIRD_X = 90;
   const BIRD_R = 13;
@@ -227,18 +228,21 @@ function FlappyBird() {
     bird: { y: H / 2, v: 0 },
     pipes: [] as Array<{ x: number; gapY: number; passed: boolean }>,
     frame: 0,
-    sinceLastPipe: 999,
+    sinceLastPipe: 99,
     groundOffset: 0,
     cloudOffset: 0,
     runId: 0,
+    lastTime: 0,
   });
 
   function reset() {
     stateRef.current.bird = { y: H / 2, v: 0 };
     stateRef.current.pipes = [];
     stateRef.current.frame = 0;
-    stateRef.current.sinceLastPipe = 999;
+    stateRef.current.sinceLastPipe = 99;
+    stateRef.current.lastTime = 0;
     setScore(0);
+    scoreRef.current = 0;
     overRef.current = false;
     force((n) => n + 1);
   }
@@ -291,9 +295,11 @@ function FlappyBird() {
       force((n) => n + 1);
     }
 
-    function tick() {
+    function tick(ts: number) {
       if (myRun !== stateRef.current.runId) return;
       const s = stateRef.current;
+      const delta = s.lastTime ? Math.min(0.03, (ts - s.lastTime) / 1000) : 1 / 60;
+      s.lastTime = ts;
 
       // background sky gradient
       const grad = ctx.createLinearGradient(0, 0, 0, H);
@@ -303,7 +309,7 @@ function FlappyBird() {
       ctx.fillRect(0, 0, W, H);
 
       // clouds (parallax)
-      s.cloudOffset = (s.cloudOffset + 0.3) % W;
+      s.cloudOffset = (s.cloudOffset + 18 * delta) % W;
       ctx.fillStyle = "rgba(255,255,255,0.7)";
       for (let i = 0; i < 4; i++) {
         const cx = ((i * 130) - s.cloudOffset + W) % W;
@@ -316,21 +322,20 @@ function FlappyBird() {
       }
 
       if (runningRef.current && !overRef.current) {
-        s.frame++;
-        s.sinceLastPipe++;
-        s.bird.v += GRAVITY;
-        // terminal velocity cap
-        if (s.bird.v > 9) s.bird.v = 9;
-        s.bird.y += s.bird.v;
+        s.frame += delta * 60;
+        s.sinceLastPipe += delta;
+        s.bird.v += GRAVITY * delta;
+        if (s.bird.v > 560) s.bird.v = 560;
+        s.bird.y += s.bird.v * delta;
 
         if (s.sinceLastPipe >= PIPE_SPACING) {
-          const minGap = 70;
-          const maxGap = H - GROUND_H - PIPE_GAP - 70;
+          const minGap = 75;
+          const maxGap = H - GROUND_H - PIPE_GAP - 75;
           const gapY = minGap + Math.random() * (maxGap - minGap);
           s.pipes.push({ x: W + 10, gapY, passed: false });
           s.sinceLastPipe = 0;
         }
-        s.pipes.forEach((p) => (p.x -= SPEED));
+        s.pipes.forEach((p) => (p.x -= SPEED * delta));
         s.pipes = s.pipes.filter((p) => p.x + PIPE_W > -10);
 
         // collisions
@@ -351,7 +356,8 @@ function FlappyBird() {
           }
           if (!p.passed && p.x + PIPE_W < BIRD_X - BIRD_R) {
             p.passed = true;
-            setScore((sc) => sc + 1);
+            scoreRef.current += 1;
+            setScore(scoreRef.current);
           }
         }
       }
@@ -364,7 +370,7 @@ function FlappyBird() {
 
       // ground (scrolling)
       if (runningRef.current && !overRef.current) {
-        s.groundOffset = (s.groundOffset + SPEED) % 24;
+        s.groundOffset = (s.groundOffset + SPEED * delta) % 24;
       }
       ctx.fillStyle = "#ded895";
       ctx.fillRect(0, H - GROUND_H, W, GROUND_H);
@@ -379,7 +385,7 @@ function FlappyBird() {
       const b = stateRef.current.bird;
       ctx.save();
       ctx.translate(BIRD_X, b.y);
-      const tilt = Math.max(-0.5, Math.min(1.2, b.v / 10));
+      const tilt = Math.max(-0.45, Math.min(1.15, b.v / 420));
       ctx.rotate(tilt);
       // body
       ctx.fillStyle = "#FFD54F";
