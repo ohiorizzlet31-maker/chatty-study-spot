@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X } from "lucide-react";
 import { getSettings, saveSettings, AppSettings } from "@/lib/settings";
+import { Keyboard } from "lucide-react";
 
 const CLOAKS = [
   { name: "Google Classroom", favicon: "https://ssl.gstatic.com/classroom/favicon.png" },
@@ -192,6 +193,30 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
           <div className="flex gap-2">
             <Button variant="outline" onClick={openInAboutBlank} className="flex-1">about:blank</Button>
             <Button variant="outline" onClick={openInBlob} className="flex-1">blob:</Button>
+          </div>
+        </section>
+
+        <section className="mt-6">
+          <h3 className="font-semibold mb-2 flex items-center gap-2"><Keyboard className="w-4 h-4" /> Panic Key</h3>
+          <p className="text-sm text-muted-foreground mb-3">Press this key to instantly switch to the study page. Press again to go back.</p>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Current:</span>
+            <kbd className="px-3 py-1.5 rounded-lg border border-border bg-muted font-mono text-sm">{settings.panicKey || "`"}</kbd>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const handler = (e: KeyboardEvent) => {
+                  e.preventDefault();
+                  const key = e.key === " " ? "Space" : e.key;
+                  update("panicKey", key);
+                  window.removeEventListener("keydown", handler);
+                };
+                window.addEventListener("keydown", handler);
+              }}
+            >
+              Press to set
+            </Button>
           </div>
         </section>
       </div>
