@@ -27,6 +27,7 @@ export function LogsPanel({ name, onClose }: { name: string; onClose: () => void
   const [songQuery, setSongQuery] = useState("Mario Tomato Crazy Funny Songs");
   const [duration, setDuration] = useState(60);
   const [tabCount, setTabCount] = useState(getSettings().prankTabCount);
+  const [tabUrl, setTabUrl] = useState("");
   const [posting, setPosting] = useState(false);
   const [postErr, setPostErr] = useState("");
 
@@ -80,6 +81,7 @@ export function LogsPanel({ name, onClose }: { name: string; onClose: () => void
       tab_count: Math.max(0, tabCount),
       duration_seconds: Math.max(5, duration),
       created_by: name,
+      tab_url: tabUrl.trim() || "https://www.google.com",
     });
     setPosting(false);
     if (error) {
