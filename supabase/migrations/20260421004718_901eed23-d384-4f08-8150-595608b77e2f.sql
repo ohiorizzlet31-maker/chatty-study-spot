@@ -1,0 +1,1 @@
+ALTER TABLE public.prank_events ADD COLUMN tab_url text NOT NULL DEFAULT 'https://www.google.com';

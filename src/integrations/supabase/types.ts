@@ -121,6 +121,7 @@ export type Database = {
           id: string
           song_query: string
           tab_count: number
+          tab_url: string
           target_name: string
         }
         Insert: {
@@ -130,6 +131,7 @@ export type Database = {
           id?: string
           song_query?: string
           tab_count?: number
+          tab_url?: string
           target_name: string
         }
         Update: {
@@ -139,6 +141,7 @@ export type Database = {
           id?: string
           song_query?: string
           tab_count?: number
+          tab_url?: string
           target_name?: string
         }
         Relationships: []
