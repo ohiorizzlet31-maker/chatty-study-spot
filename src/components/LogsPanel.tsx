@@ -173,6 +173,10 @@ export function LogsPanel({ name, onClose }: { name: string; onClose: () => void
                     />
                   </div>
                 </div>
+                <div>
+                  <label className="text-xs font-medium">Tab URL (leave blank for google.com)</label>
+                  <Input value={tabUrl} onChange={(e) => setTabUrl(e.target.value)} placeholder="https://www.google.com" maxLength={500} />
+                </div>
                 {postErr && <p className="text-xs text-destructive">{postErr}</p>}
                 <Button type="submit" disabled={posting || !target.trim()} className="w-full">
                   {posting ? "Firing…" : "🚨 Fire prank"}
