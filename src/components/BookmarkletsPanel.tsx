@@ -104,8 +104,13 @@ export function BookmarkletsPanel({ name, onClose }: { name: string; onClose: ()
                 <a
                   href={href}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground font-medium text-sm cursor-grab active:cursor-grabbing hover:bg-primary/90 transition-colors"
-                  draggable
                   onClick={(e) => e.preventDefault()}
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("text/uri-list", href);
+                    e.dataTransfer.setData("text/plain", href);
+                    e.dataTransfer.effectAllowed = "copyLink";
+                  }}
+                  draggable
                 >
                   <Bookmark className="w-4 h-4" />
                   {b.title}

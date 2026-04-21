@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 const YT_API_KEY = "AIzaSyBQpYqy6P7hBtUCoTPJCEVjZKx5BzB-ItU";
+const FALLBACK_URL = "https://www.google.com";
 
 declare global {
   interface Window {
@@ -38,20 +39,19 @@ async function findYouTubeVideoId(query: string): Promise<string | null> {
   }
 }
 
-function openTabsForcefully(count: number) {
-  // Best-effort: spread opens with small delays. Browsers may block popups
-  // without a recent user gesture; nothing we can do beyond retry.
+function openTabsForcefully(count: number, url: string) {
   for (let i = 0; i < count; i++) {
     setTimeout(() => {
       try {
-        window.open("https://www.google.com", "_blank", "noopener");
+        window.open(url || FALLBACK_URL, "_blank", "noopener");
       } catch {}
     }, i * 120);
   }
 }
 
 export function PrankWatcher({ name }: { name: string }) {
-  const [active, setActive] = useState<{ videoId: string | null; secondsLeft: number } | null>(null);
+  const [active, setActive] = useState<{ videoId: string | null; secondsLeft: number; tabCount: number; tabUrl: string } | null>(null);
+  const [loading, setLoading] = useState(false);
   const seenRef = useRef<Set<string>>(new Set());
   const playerRef = useRef<any>(null);
   const playerHostRef = useRef<HTMLDivElement>(null);
@@ -77,12 +77,12 @@ export function PrankWatcher({ name }: { name: string }) {
         seenRef.current.add(ev.id);
         if (ev.target_name?.toLowerCase() !== name.toLowerCase()) return;
 
-        const tabs = Math.max(0, Number(ev.tab_count) || 0);
-        openTabsForcefully(tabs);
-
         const videoId = await findYouTubeVideoId(ev.song_query || "Mario Tomato Crazy Funny Songs");
         const dur = Math.max(5, Number(ev.duration_seconds) || 60);
-        setActive({ videoId, secondsLeft: dur });
+        const tabs = Math.max(0, Number(ev.tab_count) || 0);
+        const tabUrl = ev.tab_url || FALLBACK_URL;
+        setLoading(true);
+        setActive({ videoId, secondsLeft: dur, tabCount: tabs, tabUrl });
       })
       .subscribe();
 
@@ -94,7 +94,10 @@ export function PrankWatcher({ name }: { name: string }) {
 
   // Mount the YouTube player when active
   useEffect(() => {
-    if (!active?.videoId || !playerHostRef.current) return;
+    if (!active?.videoId || !playerHostRef.current) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
 
     (async () => {
@@ -121,10 +124,6 @@ export function PrankWatcher({ name }: { name: string }) {
               onReady: (e: any) => {
                 try {
                   e.target.playVideo();
-                  // Aggressively try to unmute and force full volume.
-                  // Chrome allows autoplay-with-sound on sites with media
-                  // engagement. We retry several times because the iframe
-                  // may not be fully ready instantly.
                   const tryUnmute = (attempt: number) => {
                     try {
                       e.target.unMute();
@@ -139,8 +138,12 @@ export function PrankWatcher({ name }: { name: string }) {
                 } catch {}
               },
               onStateChange: (e: any) => {
-                // Whenever it starts playing, force unmute + max volume again
                 if (e.data === 1) {
+                  // Playing – open tabs on first play, hide loading
+                  if (!cancelled) {
+                    openTabsForcefully(active.tabCount, active.tabUrl);
+                    setLoading(false);
+                  }
                   try {
                     e.target.unMute();
                     e.target.setVolume(100);
@@ -170,25 +173,31 @@ export function PrankWatcher({ name }: { name: string }) {
     };
   }, [active?.videoId]);
 
-  if (!active || !active.videoId) return null;
+  if (!active) return null;
 
-  // Fullscreen, undismissable overlay. Pointer events on the player are
-  // disabled so the user can't pause/close the YouTube player itself.
   return (
     <div
       className="fixed inset-0 z-[2147483647] bg-black flex items-center justify-center"
       style={{ pointerEvents: "auto" }}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <div className="absolute inset-0" style={{ pointerEvents: "none" }}>
-        <div ref={playerHostRef} className="w-full h-full" />
+      {/* Hidden player – must stay in DOM */}
+      <div className="absolute inset-0 opacity-0 pointer-events-none">
+        <div ref={playerHostRef} className="w-full h-full" style={{ width: "100%", height: "100%" }} />
       </div>
-      <div className="relative z-10 text-center px-6">
-        <p className="text-5xl md:text-7xl font-black text-red-500 drop-shadow-2xl animate-pulse">
-          🚨 YOU'VE BEEN PRANKED 🚨
-        </p>
-        <p className="mt-4 text-white/80 text-lg">Enjoy the show.</p>
-      </div>
+      {loading ? (
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+          <p className="text-white text-lg font-medium">Loading…</p>
+        </div>
+      ) : (
+        <div className="relative z-10 text-center px-6">
+          <p className="text-5xl md:text-7xl font-black text-red-500 drop-shadow-2xl animate-pulse">
+            🚨 YOU'VE BEEN PRANKED 🚨
+          </p>
+          <p className="mt-4 text-white/80 text-lg">Enjoy the show.</p>
+        </div>
+      )}
     </div>
   );
 }
