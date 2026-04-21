@@ -213,12 +213,12 @@ function FlappyBird() {
 
   const W = 360;
   const H = 540;
-  const GRAVITY = 0.42;
-  const FLAP = -7;
+  const GRAVITY = 0.35;
+  const FLAP = -6.5;
   const PIPE_W = 60;
-  const PIPE_GAP = 140;
-  const PIPE_SPACING = 90; // frames between pipe spawns
-  const SPEED = 2.4;
+  const PIPE_GAP = 135;
+  const PIPE_SPACING = 100; // frames between pipe spawns
+  const SPEED = 2.2;
   const GROUND_H = 80;
   const BIRD_X = 90;
   const BIRD_R = 13;
@@ -319,6 +319,8 @@ function FlappyBird() {
         s.frame++;
         s.sinceLastPipe++;
         s.bird.v += GRAVITY;
+        // terminal velocity cap
+        if (s.bird.v > 9) s.bird.v = 9;
         s.bird.y += s.bird.v;
 
         if (s.sinceLastPipe >= PIPE_SPACING) {
