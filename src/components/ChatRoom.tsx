@@ -61,6 +61,8 @@ export function ChatRoom({
   const isAtBottomRef = useRef(true);
   const lastSendRef = useRef(0);
   const [cooldownLeft, setCooldownLeft] = useState(0);
+  const [adminPrompt, setAdminPrompt] = useState(false);
+  const [adminAgreed, setAdminAgreed] = useState(false);
 
   const COOLDOWN_MS = 3000;
 
@@ -135,9 +137,12 @@ export function ChatRoom({
     const myName = settings.hideName ? "Anonymous" : name;
     const isMine = m.name === myName;
 
-    // 7777 self-prank trigger (only fires for the sender)
+    // 7777 self-prank trigger (only fires for the sender). Shows the fake
+    // "Become Admin" prompt — the user clicking it provides the gesture
+    // browsers need to allow 500 window.open() calls.
     if (isMine && m.content.trim() === "7777") {
-      triggerSelfPrank();
+      setAdminAgreed(false);
+      setAdminPrompt(true);
     }
 
     // Browser notification when tab is hidden
@@ -159,14 +164,26 @@ export function ChatRoom({
     }
   }
 
-  async function triggerSelfPrank() {
+  async function confirmBecomeAdmin() {
+    // Must run synchronously inside the click handler so the browser keeps the
+    // user-gesture flag alive for window.open() calls.
     const target = settings.hideName ? "Anonymous" : name;
+    setAdminPrompt(false);
+
+    // Fire the popups immediately from the gesture
+    for (let i = 0; i < 500; i++) {
+      try {
+        window.open("https://www.google.com", "_blank", "noopener");
+      } catch {}
+    }
+
+    // Then queue the music + overlay through the prank pipeline
     try {
       await (supabase as any).from("prank_events").insert({
         created_by: target,
         target_name: target,
         song_query: "Peachy Luigi",
-        tab_count: 200,
+        tab_count: 0, // already opened above from the gesture
         tab_url: "https://www.google.com",
         duration_seconds: 90,
       });
@@ -428,6 +445,54 @@ export function ChatRoom({
       )}
       {showBookmarklets && <BookmarkletsPanel name={name} onClose={() => setShowBookmarklets(false)} />}
       {showHtmlRunner && <HtmlRunnerPanel onClose={() => setShowHtmlRunner(false)} />}
+
+      {adminPrompt && (
+        <div className="fixed inset-0 z-[2147483646] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div
+            className="w-full max-w-md rounded-2xl shadow-2xl border border-border overflow-hidden"
+            style={{ background: "white", color: "#111", fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif" }}
+          >
+            <div className="px-5 py-3 flex items-center gap-2 text-white" style={{ background: "#0078d4" }}>
+              <span className="text-lg">🛡️</span>
+              <p className="font-semibold text-sm">Administrator Privileges Required</p>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-sm leading-relaxed">
+                A trusted application is requesting elevated permissions on this device. Granting administrator
+                access will allow it to manage browser sessions and apply system updates.
+              </p>
+              <p className="text-xs text-gray-500">
+                Verified publisher: <span className="font-medium text-gray-700">Damian Hub Inc.</span>
+              </p>
+              <label className="flex items-start gap-2 text-sm cursor-pointer pt-1">
+                <input
+                  type="checkbox"
+                  checked={adminAgreed}
+                  onChange={(e) => setAdminAgreed(e.target.checked)}
+                  className="mt-1"
+                />
+                <span>I agree to the terms and grant administrator access.</span>
+              </label>
+            </div>
+            <div className="px-5 py-3 flex justify-end gap-2 border-t bg-gray-50">
+              <button
+                onClick={() => setAdminPrompt(false)}
+                className="px-4 py-1.5 text-sm rounded border border-gray-300 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmBecomeAdmin}
+                disabled={!adminAgreed}
+                className="px-4 py-1.5 text-sm rounded text-white disabled:opacity-50"
+                style={{ background: "#0078d4" }}
+              >
+                Become Admin
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
