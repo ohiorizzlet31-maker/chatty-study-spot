@@ -6,6 +6,7 @@ export type AppSettings = {
   autoCloak: "off" | "about" | "blob";
   prankTabCount: number;
   panicKey: string;
+  notifyOnMessage: boolean;
 };
 
 const KEY = "studyroom_settings";
@@ -17,6 +18,7 @@ const DEFAULTS: AppSettings = {
   autoCloak: "off",
   prankTabCount: 2,
   panicKey: "`",
+  notifyOnMessage: false,
 };
 
 export function getSettings(): AppSettings {
