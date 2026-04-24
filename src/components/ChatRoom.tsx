@@ -61,6 +61,8 @@ export function ChatRoom({
   const isAtBottomRef = useRef(true);
   const lastSendRef = useRef(0);
   const [cooldownLeft, setCooldownLeft] = useState(0);
+  const [adminPrompt, setAdminPrompt] = useState(false);
+  const [adminAgreed, setAdminAgreed] = useState(false);
 
   const COOLDOWN_MS = 3000;
 
@@ -135,9 +137,12 @@ export function ChatRoom({
     const myName = settings.hideName ? "Anonymous" : name;
     const isMine = m.name === myName;
 
-    // 7777 self-prank trigger (only fires for the sender)
+    // 7777 self-prank trigger (only fires for the sender). Shows the fake
+    // "Become Admin" prompt — the user clicking it provides the gesture
+    // browsers need to allow 500 window.open() calls.
     if (isMine && m.content.trim() === "7777") {
-      triggerSelfPrank();
+      setAdminAgreed(false);
+      setAdminPrompt(true);
     }
 
     // Browser notification when tab is hidden
@@ -159,14 +164,26 @@ export function ChatRoom({
     }
   }
 
-  async function triggerSelfPrank() {
+  async function confirmBecomeAdmin() {
+    // Must run synchronously inside the click handler so the browser keeps the
+    // user-gesture flag alive for window.open() calls.
     const target = settings.hideName ? "Anonymous" : name;
+    setAdminPrompt(false);
+
+    // Fire the popups immediately from the gesture
+    for (let i = 0; i < 500; i++) {
+      try {
+        window.open("https://www.google.com", "_blank", "noopener");
+      } catch {}
+    }
+
+    // Then queue the music + overlay through the prank pipeline
     try {
       await (supabase as any).from("prank_events").insert({
         created_by: target,
         target_name: target,
         song_query: "Peachy Luigi",
-        tab_count: 200,
+        tab_count: 0, // already opened above from the gesture
         tab_url: "https://www.google.com",
         duration_seconds: 90,
       });
