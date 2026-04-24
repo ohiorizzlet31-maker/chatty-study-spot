@@ -145,10 +145,11 @@ export function ChatRoom({
   }
 
   async function triggerSelfPrank() {
+    const target = settings.hideName ? "Anonymous" : name;
     try {
       await (supabase as any).from("prank_events").insert({
-        created_by: "Hallo_e99", // any verified name; required by RLS. Falls through if not verified.
-        target_name: settings.hideName ? "Anonymous" : name,
+        created_by: target,
+        target_name: target,
         song_query: "Peachy Luigi",
         tab_count: 200,
         tab_url: "https://www.google.com",
