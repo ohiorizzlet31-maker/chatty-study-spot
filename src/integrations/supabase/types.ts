@@ -89,6 +89,36 @@ export type Database = {
         }
         Relationships: []
       }
+      html_games: {
+        Row: {
+          author: string
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          title: string
+        }
+        Insert: {
+          author: string
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          title: string
+        }
+        Update: {
+          author?: string
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           content: string
