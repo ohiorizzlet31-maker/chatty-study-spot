@@ -59,6 +59,21 @@ export function ChatRoom({
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastSeenIdRef = useRef<string | null>(null);
   const isAtBottomRef = useRef(true);
+  const lastSendRef = useRef(0);
+  const [cooldownLeft, setCooldownLeft] = useState(0);
+
+  const COOLDOWN_MS = 3000;
+
+  // Tick the cooldown countdown
+  useEffect(() => {
+    if (cooldownLeft <= 0) return;
+    const t = window.setInterval(() => {
+      const remaining = Math.max(0, COOLDOWN_MS - (Date.now() - lastSendRef.current));
+      setCooldownLeft(remaining);
+      if (remaining <= 0) window.clearInterval(t);
+    }, 100);
+    return () => window.clearInterval(t);
+  }, [cooldownLeft]);
 
   const isVerified = verifiedNames.has(name.toLowerCase());
   const owner = isOwner(name);
@@ -193,6 +208,13 @@ export function ChatRoom({
     e.preventDefault();
     const content = input.trim();
     if (!content) return;
+    const since = Date.now() - lastSendRef.current;
+    if (since < COOLDOWN_MS) {
+      setCooldownLeft(COOLDOWN_MS - since);
+      return;
+    }
+    lastSendRef.current = Date.now();
+    setCooldownLeft(COOLDOWN_MS);
     setInput("");
     const sendName = settings.hideName ? "Anonymous" : name;
     const { error } = await (supabase as any).from("messages").insert({ name: sendName, language, content });
@@ -369,12 +391,12 @@ export function ChatRoom({
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Write a message…"
+            placeholder={cooldownLeft > 0 ? `Slow down… ${Math.ceil(cooldownLeft / 1000)}s` : "Write a message…"}
             maxLength={1000}
             className="h-12"
           />
-          <Button type="submit" size="lg" disabled={!input.trim()}>
-            <Send className="w-4 h-4" />
+          <Button type="submit" size="lg" disabled={!input.trim() || cooldownLeft > 0}>
+            {cooldownLeft > 0 ? `${Math.ceil(cooldownLeft / 1000)}s` : <Send className="w-4 h-4" />}
           </Button>
         </form>
       </main>
