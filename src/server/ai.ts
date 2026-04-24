@@ -1,11 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 
-const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const LOVABLE_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const GEMINI_MODEL = "gemma-3-1b-it";
 
-async function callAI(messages: Array<{ role: string; content: string }>) {
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) throw new Error("LOVABLE_API_KEY not configured");
-  const res = await fetch(GATEWAY, {
+async function callLovable(key: string, messages: Array<{ role: string; content: string }>) {
+  const res = await fetch(LOVABLE_GATEWAY, {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: "google/gemini-3-flash-preview", messages }),
@@ -18,6 +17,52 @@ async function callAI(messages: Array<{ role: string; content: string }>) {
   }
   const data = await res.json();
   return data.choices?.[0]?.message?.content ?? "";
+}
+
+// Direct Google Generative Language API (Gemma 3 1B). Used as a Vercel-friendly
+// fallback when LOVABLE_API_KEY is not provisioned (e.g. on a custom domain
+// hosted outside Lovable Cloud).
+async function callGemini(key: string, messages: Array<{ role: string; content: string }>) {
+  // Gemma chat models on the v1beta API don't support a separate "system" role —
+  // collapse any system messages into the first user turn.
+  const sys = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
+  const turns = messages.filter((m) => m.role !== "system");
+  const contents = turns.map((m, i) => {
+    const role = m.role === "assistant" ? "model" : "user";
+    const text = i === 0 && sys ? `${sys}\n\n${m.content}` : m.content;
+    return { role, parts: [{ text }] };
+  });
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(key)}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contents }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    if (res.status === 429) throw new Error("Gemini rate limit reached. Try again in a moment.");
+    throw new Error(`Gemini error ${res.status}: ${text}`);
+  }
+  const data = await res.json();
+  const parts = data?.candidates?.[0]?.content?.parts;
+  if (Array.isArray(parts)) return parts.map((p: any) => p?.text ?? "").join("");
+  return "";
+}
+
+async function callAI(messages: Array<{ role: string; content: string }>) {
+  const lovable = process.env.LOVABLE_API_KEY;
+  const gemini = process.env.GEMINI_API_KEY;
+  if (lovable) {
+    try {
+      return await callLovable(lovable, messages);
+    } catch (err) {
+      if (gemini) return await callGemini(gemini, messages);
+      throw err;
+    }
+  }
+  if (gemini) return await callGemini(gemini, messages);
+  throw new Error("No AI key configured (LOVABLE_API_KEY or GEMINI_API_KEY).");
 }
 
 export const translateMessage = createServerFn({ method: "POST" })

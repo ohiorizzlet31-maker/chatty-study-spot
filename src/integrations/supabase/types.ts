@@ -352,7 +352,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      reset_leaderboard: {
+        Args: { _name: string; _password: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

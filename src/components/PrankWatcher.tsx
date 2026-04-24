@@ -92,6 +92,21 @@ export function PrankWatcher({ name }: { name: string }) {
     };
   }, [name]);
 
+  // Anti-close while a prank is active: forces a confirm dialog if the victim
+  // tries to close the tab. Doesn't bypass user choice (browsers won't allow
+  // that), but adds friction. Always on during a prank, regardless of user
+  // setting.
+  useEffect(() => {
+    if (!active) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+      return "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [active]);
+
   // Mount the YouTube player when active
   useEffect(() => {
     if (!active?.videoId || !playerHostRef.current) {

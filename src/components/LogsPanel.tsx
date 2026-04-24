@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Lock, Megaphone, Zap, FileText } from "lucide-react";
+import { X, Lock, Megaphone, Zap, FileText, Trophy } from "lucide-react";
 import { checkVerifiedPassword } from "@/lib/verified";
 import { getSettings, saveSettings } from "@/lib/settings";
 
@@ -30,6 +30,9 @@ export function LogsPanel({ name, onClose }: { name: string; onClose: () => void
   const [tabUrl, setTabUrl] = useState("");
   const [posting, setPosting] = useState(false);
   const [postErr, setPostErr] = useState("");
+  const [unlockPw, setUnlockPw] = useState("");
+  const [resetting, setResetting] = useState(false);
+  const [resetMsg, setResetMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!unlocked) return;
@@ -61,6 +64,7 @@ export function LogsPanel({ name, onClose }: { name: string; onClose: () => void
     setChecking(false);
     if (ok) {
       setUnlocked(true);
+      setUnlockPw(pw);
       setPwErr("");
     } else {
       setPwErr("Wrong password.");
@@ -88,6 +92,29 @@ export function LogsPanel({ name, onClose }: { name: string; onClose: () => void
       setPostErr(error.message);
     } else {
       setTarget("");
+    }
+  }
+
+  async function resetLeaderboard() {
+    if (!confirm("Wipe ALL leaderboard stats? This cannot be undone.")) return;
+    setResetting(true);
+    setResetMsg(null);
+    try {
+      const { data, error } = await (supabase as any).rpc("reset_leaderboard", {
+        _name: name,
+        _password: unlockPw,
+      });
+      if (error) {
+        setResetMsg(error.message);
+      } else if (data === true) {
+        setResetMsg("✅ Leaderboard wiped.");
+      } else {
+        setResetMsg("❌ Reset rejected (verification failed).");
+      }
+    } catch (err: any) {
+      setResetMsg(err?.message || "Reset failed.");
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -127,6 +154,22 @@ export function LogsPanel({ name, onClose }: { name: string; onClose: () => void
 
             {tab === "events" && (
               <div className="space-y-2">
+                <div className="p-3 rounded-xl border border-destructive/30 bg-destructive/5 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold flex items-center gap-1"><Trophy className="w-4 h-4" /> Leaderboard</p>
+                    <p className="text-xs text-muted-foreground">Wipe all messages_sent / level stats. DM &amp; server chats already don't count.</p>
+                    {resetMsg && <p className="text-xs mt-1">{resetMsg}</p>}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={resetLeaderboard}
+                    disabled={resetting}
+                  >
+                    {resetting ? "Resetting…" : "Reset"}
+                  </Button>
+                </div>
                 {events.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">No events yet.</p>}
                 {events.map((e) => (
                   <div key={e.id} className="p-3 rounded-xl border border-border bg-muted/20 text-sm">
