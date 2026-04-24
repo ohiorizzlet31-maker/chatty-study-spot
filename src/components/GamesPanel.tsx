@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { X, Gamepad2 } from "lucide-react";
+import { HtmlGamesPanel } from "@/components/HtmlGamesPanel";
 
-type GameId = "menu" | "ttt" | "flappy" | "g2048" | "tetris" | "snake";
+type GameId = "menu" | "ttt" | "flappy" | "g2048" | "tetris" | "snake" | "html";
 
-export function GamesPanel({ onClose }: { onClose: () => void }) {
+export function GamesPanel({ onClose, name }: { onClose: () => void; name: string }) {
   const [game, setGame] = useState<GameId>("menu");
 
   const titles: Record<GameId, string> = {
@@ -14,6 +15,7 @@ export function GamesPanel({ onClose }: { onClose: () => void }) {
     g2048: "2048",
     tetris: "Tetris",
     snake: "Snake",
+    html: "HTML Games",
   };
 
   return (
@@ -39,6 +41,7 @@ export function GamesPanel({ onClose }: { onClose: () => void }) {
             <GameTile emoji="🔢" name="2048" desc="Arrows / swipe" onClick={() => setGame("g2048")} />
             <GameTile emoji="🧱" name="Tetris" desc="Stack & clear lines" onClick={() => setGame("tetris")} />
             <GameTile emoji="🐍" name="Snake" desc="Eat & grow" onClick={() => setGame("snake")} />
+            <GameTile emoji="🌐" name="HTML Games" desc="Custom community games" onClick={() => setGame("html")} />
           </div>
         )}
 
@@ -47,6 +50,7 @@ export function GamesPanel({ onClose }: { onClose: () => void }) {
         {game === "g2048" && <Game2048 />}
         {game === "tetris" && <Tetris />}
         {game === "snake" && <Snake />}
+        {game === "html" && <HtmlGamesPanel name={name} />}
       </div>
     </div>
   );

@@ -139,6 +139,17 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             checked={settings.antiClose}
             onChange={(v) => update("antiClose", v)}
           />
+          <Toggle
+            title="Notify on new chat messages"
+            desc="Show a desktop notification when someone messages while you're on another tab"
+            checked={settings.notifyOnMessage}
+            onChange={(v) => {
+              update("notifyOnMessage", v);
+              if (v && typeof Notification !== "undefined" && Notification.permission === "default") {
+                Notification.requestPermission().catch(() => {});
+              }
+            }}
+          />
         </section>
 
         <section className="mb-6">

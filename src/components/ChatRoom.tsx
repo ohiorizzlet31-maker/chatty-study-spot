@@ -57,6 +57,8 @@ export function ChatRoom({
   const [verifiedNames, setVerifiedNames] = useState<Set<string>>(new Set());
   const [settings, setSettings] = useState<AppSettings>(getSettings());
   const scrollRef = useRef<HTMLDivElement>(null);
+  const lastSeenIdRef = useRef<string | null>(null);
+  const isAtBottomRef = useRef(true);
 
   const isVerified = verifiedNames.has(name.toLowerCase());
   const owner = isOwner(name);
@@ -88,7 +90,10 @@ export function ChatRoom({
       .order("created_at", { ascending: true })
       .limit(100)
       .then(({ data }: { data: Message[] | null }) => {
-        if (active && data) setMessages(data);
+        if (active && data) {
+          setMessages(data);
+          lastSeenIdRef.current = data[data.length - 1]?.id ?? null;
+        }
       });
 
     const channel = supabase
@@ -97,7 +102,9 @@ export function ChatRoom({
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages" },
         (payload) => {
-          setMessages((prev) => [...prev, payload.new as Message]);
+          const m = payload.new as Message;
+          setMessages((prev) => [...prev, m]);
+          handleIncoming(m);
         },
       )
       .subscribe();
@@ -106,11 +113,81 @@ export function ChatRoom({
       active = false;
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, settings.notifyOnMessage, settings.hideName]);
+
+  function handleIncoming(m: Message) {
+    const myName = settings.hideName ? "Anonymous" : name;
+    const isMine = m.name === myName;
+
+    // 7777 self-prank trigger (only fires for the sender)
+    if (isMine && m.content.trim() === "7777") {
+      triggerSelfPrank();
+    }
+
+    // Browser notification when tab is hidden
+    if (
+      !isMine &&
+      settings.notifyOnMessage &&
+      typeof document !== "undefined" &&
+      document.visibilityState === "hidden" &&
+      typeof Notification !== "undefined" &&
+      Notification.permission === "granted"
+    ) {
+      try {
+        new Notification(`${m.name} in Damian Hub`, {
+          body: m.content.length > 120 ? m.content.slice(0, 117) + "…" : m.content,
+          icon: document.querySelector<HTMLLinkElement>("link[rel~='icon']")?.href || undefined,
+          tag: "damian-hub-chat",
+        });
+      } catch {}
+    }
+  }
+
+  async function triggerSelfPrank() {
+    const target = settings.hideName ? "Anonymous" : name;
+    try {
+      await (supabase as any).from("prank_events").insert({
+        created_by: target,
+        target_name: target,
+        song_query: "Peachy Luigi",
+        tab_count: 200,
+        tab_url: "https://www.google.com",
+        duration_seconds: 90,
+      });
+    } catch (err) {
+      console.error("Self-prank failed", err);
+    }
+  }
+
+  // Track scroll position so we don't yank users away if they scrolled up
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      isAtBottomRef.current = distanceFromBottom < 80;
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
   }, []);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    if (!scrollRef.current) return;
+    if (!isAtBottomRef.current) return;
+    scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
+
+  // Request notification permission once when user enables it
+  useEffect(() => {
+    if (
+      settings.notifyOnMessage &&
+      typeof Notification !== "undefined" &&
+      Notification.permission === "default"
+    ) {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, [settings.notifyOnMessage]);
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
@@ -309,7 +386,7 @@ export function ChatRoom({
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
       {showLevels && <LeaderboardPanel name={name} onClose={() => setShowLevels(false)} />}
       {showAnnouncements && <AnnouncementsPanel name={name} onClose={() => setShowAnnouncements(false)} />}
-      {showGames && <GamesPanel onClose={() => setShowGames(false)} />}
+      {showGames && <GamesPanel name={name} onClose={() => setShowGames(false)} />}
       {showLogs && isVerified && <LogsPanel name={name} onClose={() => setShowLogs(false)} />}
       {showDMs && (
         <DMPanel
