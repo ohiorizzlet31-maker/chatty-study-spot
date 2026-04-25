@@ -37,15 +37,15 @@ function loadYouTubeAPI(): Promise<void> {
   });
 }
 
-async function findYouTubeVideoId(query: string): Promise<string | null> {
+async function findEmbeddableVideoIds(query: string, max = 5): Promise<string[]> {
   try {
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=1&videoEmbeddable=true&q=${encodeURIComponent(query)}&key=${YT_API_KEY}`;
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${max}&videoEmbeddable=true&videoSyndicated=true&q=${encodeURIComponent(query)}&key=${YT_API_KEY}`;
     const res = await fetch(url);
-    if (!res.ok) return null;
+    if (!res.ok) return [];
     const data = await res.json();
-    return data.items?.[0]?.id?.videoId ?? null;
+    return (data.items || []).map((i: any) => i.id?.videoId).filter(Boolean);
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -58,6 +58,8 @@ export function MusicPanel({ onClose }: { onClose: () => void }) {
   const [loadingPlay, setLoadingPlay] = useState(false);
   const [error, setError] = useState("");
   const [source, setSource] = useState<"itunes" | "youtube">("itunes");
+  const [fallbackIds, setFallbackIds] = useState<string[]>([]);
+  const fallbackIdxRef = useRef(0);
   const playerRef = useRef<any>(null);
   const playerContainer = useRef<HTMLDivElement>(null);
 
@@ -109,14 +111,22 @@ export function MusicPanel({ onClose }: { onClose: () => void }) {
     setLoadingPlay(true);
     setNow(track);
     try {
-      // If from YouTube search, we already have the videoId
+      // Build a fallback list so if the chosen video is embed-blocked
+      // ("Video unavailable" / org block), we auto-skip to the next.
       const ytId = (track as any).youtubeId as string | undefined;
-      const videoId = ytId ?? (await findYouTubeVideoId(`${track.trackName} ${track.artistName}`));
-      if (!videoId) {
-        setError("Couldn't find a YouTube version. Try another track.");
+      const candidates = await findEmbeddableVideoIds(
+        `${track.trackName} ${track.artistName}`,
+        5,
+      );
+      const queue = ytId ? [ytId, ...candidates.filter((id) => id !== ytId)] : candidates;
+      if (queue.length === 0) {
+        setError("Couldn't find a playable YouTube version. Try another track.");
         setLoadingPlay(false);
         return;
       }
+      setFallbackIds(queue);
+      fallbackIdxRef.current = 0;
+      const videoId = queue[0];
       await loadYouTubeAPI();
       if (playerRef.current) {
         playerRef.current.loadVideoById(videoId);
@@ -134,6 +144,24 @@ export function MusicPanel({ onClose }: { onClose: () => void }) {
               if (e.data === 1) setPlaying(true);
               if (e.data === 2) setPlaying(false);
               if (e.data === 0) setPlaying(false);
+            },
+            onError: (e: any) => {
+              // 2: invalid id, 5: HTML5 player error, 100: not found,
+              // 101/150: embedding disabled by owner / blocked
+              const code = e?.data;
+              const next = fallbackIdxRef.current + 1;
+              if (next < fallbackIds.length) {
+                fallbackIdxRef.current = next;
+                playerRef.current.loadVideoById(fallbackIds[next]);
+                playerRef.current.playVideo();
+              } else {
+                setError(
+                  code === 101 || code === 150
+                    ? "Embedding blocked for every match. Open on YouTube directly."
+                    : `Playback error (code ${code}).`,
+                );
+                setPlaying(false);
+              }
             },
           },
         });
@@ -182,7 +210,21 @@ export function MusicPanel({ onClose }: { onClose: () => void }) {
               </Button>
             </div>
           )}
-          {error && <p className="text-sm text-destructive p-3 bg-background">{error}</p>}
+          {error && (
+            <div className="p-3 bg-background flex items-center justify-between gap-3">
+              <p className="text-sm text-destructive flex-1">{error}</p>
+              {now && (
+                <a
+                  href={`https://www.youtube.com/results?search_query=${encodeURIComponent(now.trackName + " " + now.artistName)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs underline whitespace-nowrap"
+                >
+                  Open on YouTube
+                </a>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Search side */}
