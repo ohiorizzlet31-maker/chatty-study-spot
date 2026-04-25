@@ -5,7 +5,7 @@ import { SecretGate } from "@/components/SecretGate";
 import { ChatRoom } from "@/components/ChatRoom";
 import { AppleBoot } from "@/components/AppleBoot";
 import { applySavedCloak, maybeAutoLaunchCloak } from "@/components/SettingsPanel";
-import { getSettings, useSettingsListener } from "@/lib/settings";
+import { getSettings, useSettingsListener, applyTheme } from "@/lib/settings";
 
 type Stage = "tips" | "password" | "setup" | "boot" | "chat" | "panic";
 const STORAGE_KEY = "studyroom_profile";
@@ -31,6 +31,7 @@ function Index() {
   useEffect(() => {
     applySavedCloak();
     maybeAutoLaunchCloak();
+    applyTheme(getSettings().theme);
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {

