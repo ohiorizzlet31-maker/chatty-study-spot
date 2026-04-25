@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { X, Lock, Code2, Play, ArrowLeft, BadgeCheck } from "lucide-react";
+import { X, Lock, Code2, Play, ArrowLeft, BadgeCheck, Trash2 } from "lucide-react";
 import { isVerifiedName, checkVerifiedPassword } from "@/lib/verified";
 
 type HtmlGame = {
@@ -33,6 +33,8 @@ export function HtmlGamesPanel({ name }: { name: string }) {
   const [pw, setPw] = useState("");
   const [pwError, setPwError] = useState("");
   const [checking, setChecking] = useState(false);
+
+  const canDelete = name === "Hallo_e99" || name === "Aiden";
 
   useEffect(() => {
     isVerifiedName(name).then(setCanTry);
@@ -79,6 +81,14 @@ export function HtmlGamesPanel({ name }: { name: string }) {
     if (error) { console.error(error); return; }
     setTitle(""); setDescription(""); setImageUrl(""); setCode("");
     setShowPost(false);
+  }
+
+  async function deleteGame(g: HtmlGame) {
+    if (!canDelete) return;
+    if (!confirm(`Delete "${g.title}"? This cannot be undone.`)) return;
+    const { error } = await (supabase as any).from("html_games").delete().eq("id", g.id);
+    if (error) { console.error(error); alert("Delete failed: " + error.message); return; }
+    setItems((prev) => prev.filter((x) => x.id !== g.id));
   }
 
   if (playing) {
@@ -157,28 +167,38 @@ export function HtmlGamesPanel({ name }: { name: string }) {
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {items.map((g) => (
-          <button
+          <div
             key={g.id}
-            onClick={() => setPlaying(g)}
-            className="text-left rounded-2xl border border-border hover:border-primary transition-all overflow-hidden bg-card"
+            className="relative rounded-2xl border border-border hover:border-primary transition-all overflow-hidden bg-card"
           >
-            {g.image_url ? (
-              <img src={g.image_url} alt={g.title} className="w-full h-32 object-cover" />
-            ) : (
-              <div className="w-full h-32 flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
-                <Play className="w-10 h-10 text-primary" />
-              </div>
-            )}
-            <div className="p-3">
-              <p className="font-semibold text-sm truncate">{g.title}</p>
-              {g.description && (
-                <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{g.description}</p>
+            <button onClick={() => setPlaying(g)} className="text-left w-full">
+              {g.image_url ? (
+                <img src={g.image_url} alt={g.title} className="w-full h-32 object-cover" />
+              ) : (
+                <div className="w-full h-32 flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
+                  <Play className="w-10 h-10 text-primary" />
+                </div>
               )}
-              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                by {g.author} <BadgeCheck className="w-3 h-3 text-primary" />
-              </p>
-            </div>
-          </button>
+              <div className="p-3">
+                <p className="font-semibold text-sm truncate">{g.title}</p>
+                {g.description && (
+                  <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{g.description}</p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                  by {g.author} <BadgeCheck className="w-3 h-3 text-primary" />
+                </p>
+              </div>
+            </button>
+            {canDelete && (
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteGame(g); }}
+                title="Delete game"
+                className="absolute top-2 right-2 p-1.5 rounded-lg bg-background/90 border border-border hover:bg-destructive hover:text-destructive-foreground transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         ))}
       </div>
     </div>
