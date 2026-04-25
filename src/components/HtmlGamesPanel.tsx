@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { X, Lock, Code2, Play, ArrowLeft, BadgeCheck, Trash2 } from "lucide-react";
+import { Lock, Code2, Play, ArrowLeft, BadgeCheck, Trash2 } from "lucide-react";
 import { isVerifiedName, checkVerifiedPassword } from "@/lib/verified";
 
 type HtmlGame = {
