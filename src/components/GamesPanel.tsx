@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { X, Gamepad2 } from "lucide-react";
 import { HtmlGamesPanel } from "@/components/HtmlGamesPanel";
+import { GnMathPanel } from "@/components/GnMathPanel";
 
-type GameId = "menu" | "ttt" | "flappy" | "g2048" | "tetris" | "snake" | "html";
+type GameId = "menu" | "ttt" | "flappy" | "g2048" | "tetris" | "snake" | "html" | "gnmath";
 
 export function GamesPanel({ onClose, name }: { onClose: () => void; name: string }) {
   const [game, setGame] = useState<GameId>("menu");
@@ -16,6 +17,7 @@ export function GamesPanel({ onClose, name }: { onClose: () => void; name: strin
     tetris: "Tetris",
     snake: "Snake",
     html: "HTML Games",
+    gnmath: "gn-math",
   };
 
   return (
@@ -42,6 +44,7 @@ export function GamesPanel({ onClose, name }: { onClose: () => void; name: strin
             <GameTile emoji="🧱" name="Tetris" desc="Stack & clear lines" onClick={() => setGame("tetris")} />
             <GameTile emoji="🐍" name="Snake" desc="Eat & grow" onClick={() => setGame("snake")} />
             <GameTile emoji="🌐" name="HTML Games" desc="Custom community games" onClick={() => setGame("html")} />
+            <GameTile emoji="🧮" name="gn-math" desc="Math game hub" onClick={() => setGame("gnmath")} badge="BETA" />
           </div>
         )}
 
@@ -51,14 +54,20 @@ export function GamesPanel({ onClose, name }: { onClose: () => void; name: strin
         {game === "tetris" && <Tetris />}
         {game === "snake" && <Snake />}
         {game === "html" && <HtmlGamesPanel name={name} />}
+        {game === "gnmath" && <GnMathPanel />}
       </div>
     </div>
   );
 }
 
-function GameTile({ emoji, name, desc, onClick }: { emoji: string; name: string; desc: string; onClick: () => void }) {
+function GameTile({ emoji, name, desc, onClick, badge }: { emoji: string; name: string; desc: string; onClick: () => void; badge?: string }) {
   return (
-    <button onClick={onClick} className="p-4 rounded-2xl border border-border hover:border-primary transition-all text-left">
+    <button onClick={onClick} className="relative p-4 rounded-2xl border border-border hover:border-primary transition-all text-left">
+      {badge && (
+        <span className="absolute top-2 right-2 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500 text-white">
+          {badge}
+        </span>
+      )}
       <p className="text-3xl mb-2">{emoji}</p>
       <p className="font-semibold">{name}</p>
       <p className="text-xs text-muted-foreground">{desc}</p>
