@@ -153,6 +153,21 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
         </section>
 
         <section className="mb-6">
+          <h3 className="font-semibold mb-2">Theme</h3>
+          <div className="grid grid-cols-3 gap-2">
+            {(["light", "dark", "oled"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => update("theme", t)}
+                className={`py-2 rounded-xl border text-sm font-medium ${settings.theme === t ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-primary/50"}`}
+              >
+                {t === "light" ? "☀️ Light" : t === "dark" ? "🌙 Dark" : "⚫ True Dark (OLED)"}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="mb-6">
           <h3 className="font-semibold mb-2">Auto launch in disguise</h3>
           <p className="text-sm text-muted-foreground mb-3">When you open the site, automatically open it inside about:blank or blob: and redirect this tab to Google Classroom.</p>
           <div className="grid grid-cols-3 gap-2">
