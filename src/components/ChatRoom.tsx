@@ -15,7 +15,8 @@ import { DMPanel } from "@/components/DMPanel";
 import { ServersPanel } from "@/components/ServersPanel";
 import { HtmlRunnerPanel } from "@/components/HtmlRunnerPanel";
 import { WebsitePanel } from "@/components/WebsitePanel";
-import { Languages, Music, Sparkles, LogOut, Send, Settings, Trophy, Megaphone, Gamepad2, FileText, BadgeCheck, Crown, MessageSquare, Server as ServerIcon, Code, Globe } from "lucide-react";
+import { ProxyPanel } from "@/components/ProxyPanel";
+import { Languages, Music, Sparkles, LogOut, Send, Settings, Trophy, Megaphone, Gamepad2, FileText, BadgeCheck, Crown, MessageSquare, Server as ServerIcon, Code, Globe, Shield } from "lucide-react";
 import { loadVerified } from "@/lib/verified";
 import { isOwner } from "@/lib/device";
 import { getSettings, useSettingsListener, AppSettings } from "@/lib/settings";
@@ -52,6 +53,7 @@ export function ChatRoom({
   const [showServers, setShowServers] = useState(false);
   const [showHtmlRunner, setShowHtmlRunner] = useState(false);
   const [showWebsite, setShowWebsite] = useState(false);
+  const [showProxy, setShowProxy] = useState(false);
   const [dmPeer, setDmPeer] = useState<string | null>(null);
   const [nameMenu, setNameMenu] = useState<string | null>(null);
   const [verifiedNames, setVerifiedNames] = useState<Set<string>>(new Set());
@@ -343,6 +345,9 @@ export function ChatRoom({
             <Button variant="ghost" size="sm" onClick={() => setShowWebsite(true)}>
               <Globe className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Website</span>
             </Button>
+            <Button variant="ghost" size="sm" onClick={() => setShowProxy(true)}>
+              <Shield className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Proxy</span>
+            </Button>
             {isVerified && (
               <Button variant="ghost" size="sm" onClick={() => setShowLogs(true)}>
                 <FileText className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Logs</span>
@@ -474,6 +479,7 @@ export function ChatRoom({
       )}
       {showHtmlRunner && <HtmlRunnerPanel onClose={() => setShowHtmlRunner(false)} />}
       {showWebsite && <WebsitePanel onClose={() => setShowWebsite(false)} />}
+      {showProxy && <ProxyPanel onClose={() => setShowProxy(false)} />}
 
       {adminPrompt && (
         <div className="fixed inset-0 z-[2147483646] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
