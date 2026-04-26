@@ -416,7 +416,7 @@ export function ChatRoom({
                       {verified && <BadgeCheck className="w-3 h-3 text-primary" />}
                     </button>
                     <span className="opacity-60">· {m.language}</span>
-                    {!(settings.hideTimestamps && mine) && (
+                    {!(mine && settings.hideTimestamps) && !hideTsNames.has(m.name) && (
                       <span className="opacity-60">· {fmtTime(m.created_at)}</span>
                     )}
                     {menuOpen && !mine && m.name !== "Anonymous" && (
