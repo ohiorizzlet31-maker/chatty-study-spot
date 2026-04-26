@@ -3,8 +3,21 @@ import { Button } from "@/components/ui/button";
 import { X, Gamepad2 } from "lucide-react";
 import { HtmlGamesPanel } from "@/components/HtmlGamesPanel";
 import { GnMathPanel } from "@/components/GnMathPanel";
+import {
+  Dino,
+  Minesweeper,
+  Plinko,
+  MinesGame,
+  Pong,
+  RPS,
+  WhackAMole,
+  Asteroids,
+  MiniMinecraft,
+} from "@/components/MoreGames";
 
-type GameId = "menu" | "ttt" | "flappy" | "g2048" | "tetris" | "snake" | "html" | "gnmath";
+type GameId =
+  | "menu" | "ttt" | "flappy" | "g2048" | "tetris" | "snake" | "html" | "gnmath"
+  | "dino" | "msweeper" | "plinko" | "mines" | "pong" | "rps" | "whack" | "asteroids" | "mc";
 
 export function GamesPanel({ onClose, name }: { onClose: () => void; name: string }) {
   const [game, setGame] = useState<GameId>("menu");
@@ -18,11 +31,20 @@ export function GamesPanel({ onClose, name }: { onClose: () => void; name: strin
     snake: "Snake",
     html: "HTML Games",
     gnmath: "gn-math",
+    dino: "Dino Run",
+    msweeper: "Minesweeper",
+    plinko: "Plinko",
+    mines: "Mines",
+    pong: "Pong",
+    rps: "Rock Paper Scissors",
+    whack: "Whack-a-Mole",
+    asteroids: "Asteroids",
+    mc: "Mini Minecraft",
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-md p-4" onClick={onClose}>
-      <div className="bg-card border border-border rounded-3xl p-6 w-full max-w-2xl shadow-[var(--shadow-soft)] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-card border border-border rounded-3xl p-6 w-full max-w-3xl shadow-[var(--shadow-soft)] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Gamepad2 className="w-6 h-6 text-primary" />
@@ -45,6 +67,15 @@ export function GamesPanel({ onClose, name }: { onClose: () => void; name: strin
             <GameTile emoji="🐍" name="Snake" desc="Eat & grow" onClick={() => setGame("snake")} />
             <GameTile emoji="🌐" name="HTML Games" desc="Custom community games" onClick={() => setGame("html")} />
             <GameTile emoji="🧮" name="gn-math" desc="Math game hub" onClick={() => setGame("gnmath")} badge="BETA" />
+            <GameTile emoji="🦖" name="Dino Run" desc="Jump cacti, classic" onClick={() => setGame("dino")} />
+            <GameTile emoji="💣" name="Minesweeper" desc="9×9 · 10 mines" onClick={() => setGame("msweeper")} />
+            <GameTile emoji="🪙" name="Plinko" desc="Drop ball, win fake $" onClick={() => setGame("plinko")} />
+            <GameTile emoji="💎" name="Mines" desc="Crypto-style mines" onClick={() => setGame("mines")} />
+            <GameTile emoji="🏓" name="Pong" desc="vs AI" onClick={() => setGame("pong")} />
+            <GameTile emoji="✊" name="Rock Paper Scissors" desc="Best of forever" onClick={() => setGame("rps")} />
+            <GameTile emoji="🐹" name="Whack-a-Mole" desc="30s scramble" onClick={() => setGame("whack")} />
+            <GameTile emoji="🚀" name="Asteroids" desc="← → ↑ + Space" onClick={() => setGame("asteroids")} />
+            <GameTile emoji="⛏️" name="Mini Minecraft" desc="2D survival" onClick={() => setGame("mc")} badge="NEW" />
           </div>
         )}
 
@@ -55,6 +86,15 @@ export function GamesPanel({ onClose, name }: { onClose: () => void; name: strin
         {game === "snake" && <Snake />}
         {game === "html" && <HtmlGamesPanel name={name} />}
         {game === "gnmath" && <GnMathPanel />}
+        {game === "dino" && <Dino />}
+        {game === "msweeper" && <Minesweeper />}
+        {game === "plinko" && <Plinko />}
+        {game === "mines" && <MinesGame />}
+        {game === "pong" && <Pong />}
+        {game === "rps" && <RPS />}
+        {game === "whack" && <WhackAMole />}
+        {game === "asteroids" && <Asteroids />}
+        {game === "mc" && <MiniMinecraft />}
       </div>
     </div>
   );
