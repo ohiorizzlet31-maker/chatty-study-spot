@@ -19,7 +19,7 @@ import { ProxyPanel } from "@/components/ProxyPanel";
 import { Languages, Music, Sparkles, LogOut, Send, Settings, Trophy, Megaphone, Gamepad2, FileText, BadgeCheck, Crown, MessageSquare, Server as ServerIcon, Code, Globe, Shield } from "lucide-react";
 import { loadVerified } from "@/lib/verified";
 import { isOwner } from "@/lib/device";
-import { getSettings, useSettingsListener, AppSettings } from "@/lib/settings";
+import { getSettings, useSettingsListener, AppSettings, syncHideTimestamps } from "@/lib/settings";
 
 type Message = {
   id: string;
@@ -87,8 +87,11 @@ export function ChatRoom({
     loadVerified().then((rows) => {
       setVerifiedNames(new Set(rows.map((r) => r.name.toLowerCase())));
     });
+    // Push current local hideTimestamps to server so others see it too
+    if (name) void syncHideTimestamps(name, getSettings().hideTimestamps);
     return useSettingsListener(setSettings);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name]);
 
   // Load + subscribe to which users have hide_timestamps enabled
   useEffect(() => {
