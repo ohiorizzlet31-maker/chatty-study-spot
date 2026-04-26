@@ -7,13 +7,25 @@ import { Keyboard } from "lucide-react";
 
 const CLOAKS = [
   { name: "Google Classroom", favicon: "https://ssl.gstatic.com/classroom/favicon.png" },
-  { name: "Clever | Portal", favicon: "https://clever.com/favicon.ico" },
-  { name: "i-Ready", favicon: "https://login.i-ready.com/favicon.ico" },
-  { name: "Khan Academy", favicon: "https://cdn.kastatic.org/images/favicon.ico" },
   { name: "Google Docs", favicon: "https://ssl.gstatic.com/docs/documents/images/kix-favicon-2023q4.ico" },
   { name: "Google Drive", favicon: "https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png" },
-  { name: "Schoology", favicon: "https://www.schoology.com/sites/all/themes/schoology_theme/favicon.ico" },
+  { name: "Google", favicon: "https://www.google.com/favicon.ico" },
+  { name: "New Tab", favicon: "https://www.google.com/favicon.ico" },
   { name: "Canvas", favicon: "https://du11hjcvx0uqb.cloudfront.net/dist/images/favicon-e10d657a73.ico" },
+  { name: "IXL Learning", favicon: "https://www.ixl.com/favicon.ico" },
+  { name: "i-Ready", favicon: "https://login.i-ready.com/favicon.ico" },
+  { name: "Khan Academy", favicon: "https://cdn.kastatic.org/images/favicon.ico" },
+  { name: "Gimkit", favicon: "https://www.gimkit.com/favicon.ico" },
+  { name: "Blooket", favicon: "https://www.blooket.com/favicon.ico" },
+  { name: "Kahoot!", favicon: "https://kahoot.com/favicon.ico" },
+  { name: "Epic!", favicon: "https://www.getepic.com/favicon.ico" },
+  { name: "Kiddle", favicon: "https://www.kiddle.co/favicon.ico" },
+  { name: "Newsela", favicon: "https://newsela.com/favicon.ico" },
+  { name: "Seesaw", favicon: "https://web.seesaw.me/favicon.ico" },
+  { name: "Clever | Portal", favicon: "https://clever.com/favicon.ico" },
+  { name: "Study.com", favicon: "https://study.com/favicon.ico" },
+  { name: "Ducksters", favicon: "https://www.ducksters.com/favicon.ico" },
+  { name: "Schoology", favicon: "https://www.schoology.com/sites/all/themes/schoology_theme/favicon.ico" },
 ];
 
 function setFavicon(url: string) {
