@@ -1,3 +1,5 @@
+import { supabase } from "@/integrations/supabase/client";
+
 // Centralized client settings (localStorage)
 export type AppSettings = {
   hideTimestamps: boolean;
@@ -38,6 +40,34 @@ export function saveSettings(s: AppSettings) {
   localStorage.setItem(KEY, JSON.stringify(s));
   window.dispatchEvent(new CustomEvent("studyroom-settings-changed"));
   applyTheme(s.theme);
+}
+
+/**
+ * Sync the user's hide_timestamps preference to the public user_stats table
+ * so OTHER users see this user's messages without timestamps too.
+ */
+export async function syncHideTimestamps(name: string, hide: boolean) {
+  if (!name) return;
+  try {
+    // Try update first
+    const { data: existing } = await (supabase as any)
+      .from("user_stats")
+      .select("name")
+      .eq("name", name)
+      .maybeSingle();
+    if (existing) {
+      await (supabase as any)
+        .from("user_stats")
+        .update({ hide_timestamps: hide })
+        .eq("name", name);
+    } else {
+      await (supabase as any)
+        .from("user_stats")
+        .insert({ name, hide_timestamps: hide });
+    }
+  } catch (err) {
+    console.error("syncHideTimestamps failed", err);
+  }
 }
 
 export function useSettingsListener(cb: (s: AppSettings) => void) {
