@@ -307,6 +307,7 @@ export type Database = {
       }
       user_stats: {
         Row: {
+          hide_timestamps: boolean
           id: string
           level: number
           messages_sent: number
@@ -314,6 +315,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          hide_timestamps?: boolean
           id?: string
           level?: number
           messages_sent?: number
@@ -321,6 +323,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          hide_timestamps?: boolean
           id?: string
           level?: number
           messages_sent?: number
