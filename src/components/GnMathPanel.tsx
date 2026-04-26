@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AlertTriangle, Wifi, WifiOff, RefreshCw } from "lucide-react";
+import { AlertTriangle, Wifi, WifiOff, RefreshCw, Maximize2, Minimize2, GripHorizontal } from "lucide-react";
 
 const HTML_URL = "/gn-math.html";
 const CACHE_KEY = "gn-math-cached-html-v1";
@@ -14,6 +14,50 @@ export function GnMathPanel() {
   const [cachedSrc, setCachedSrc] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState<number>(() => {
+    if (typeof window === "undefined") return 540;
+    const saved = Number(localStorage.getItem("gn-math-height") || 0);
+    return saved && saved > 200 ? saved : Math.min(640, Math.round(window.innerHeight * 0.7));
+  });
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  function toggleFullscreen() {
+    const el = containerRef.current;
+    if (!el) return;
+    if (!document.fullscreenElement) {
+      el.requestFullscreen?.().then(() => setIsFullscreen(true)).catch(() => {});
+    } else {
+      document.exitFullscreen?.().then(() => setIsFullscreen(false)).catch(() => {});
+    }
+  }
+
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  function startResize(e: React.PointerEvent) {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startH = height;
+    const onMove = (ev: PointerEvent) => {
+      const next = Math.max(240, Math.min(window.innerHeight - 80, startH + (ev.clientY - startY)));
+      setHeight(next);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      try { localStorage.setItem("gn-math-height", String(height)); } catch {}
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
+
+  useEffect(() => {
+    try { localStorage.setItem("gn-math-height", String(height)); } catch {}
+  }, [height]);
 
   // After the iframe loads successfully, snapshot the HTML into localStorage for offline use
   useEffect(() => {
@@ -107,7 +151,7 @@ export function GnMathPanel() {
   }
 
   return (
-    <div className="space-y-3">
+    <div ref={containerRef} className="space-y-3 bg-background">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-amber-500 text-white">BETA</span>
         <span className="text-xs flex items-center gap-1 text-muted-foreground">
@@ -124,6 +168,9 @@ export function GnMathPanel() {
               <WifiOff className="w-3 h-3 mr-1" /> Use cached version
             </Button>
           )}
+          <Button size="sm" variant="outline" onClick={toggleFullscreen}>
+            {isFullscreen ? <><Minimize2 className="w-3 h-3 mr-1" /> Exit</> : <><Maximize2 className="w-3 h-3 mr-1" /> Fullscreen</>}
+          </Button>
         </div>
       </div>
 
@@ -138,9 +185,21 @@ export function GnMathPanel() {
         key={mode === "live" ? "live" : cachedSrc || "cached"}
         src={mode === "live" ? HTML_URL : cachedSrc || ""}
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-pointer-lock"
-        className="w-full h-[70vh] rounded-xl border border-border bg-white"
+        className="w-full rounded-xl border border-border bg-white"
+        style={{ height: isFullscreen ? "calc(100vh - 90px)" : `${height}px` }}
         title="gn-math"
       />
+
+      {!isFullscreen && (
+        <div
+          onPointerDown={startResize}
+          className="flex items-center justify-center gap-1 cursor-ns-resize select-none py-1 rounded-md hover:bg-muted text-muted-foreground"
+          title="Drag to resize"
+        >
+          <GripHorizontal className="w-4 h-4" />
+          <span className="text-[10px]">drag to resize</span>
+        </div>
+      )}
 
       <p className="text-[10px] text-muted-foreground">
         First load saves an offline copy automatically. Next time, if it doesn't load

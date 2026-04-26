@@ -19,7 +19,7 @@ import { ProxyPanel } from "@/components/ProxyPanel";
 import { Languages, Music, Sparkles, LogOut, Send, Settings, Trophy, Megaphone, Gamepad2, FileText, BadgeCheck, Crown, MessageSquare, Server as ServerIcon, Code, Globe, Shield } from "lucide-react";
 import { loadVerified } from "@/lib/verified";
 import { isOwner } from "@/lib/device";
-import { getSettings, useSettingsListener, AppSettings } from "@/lib/settings";
+import { getSettings, useSettingsListener, AppSettings, syncHideTimestamps } from "@/lib/settings";
 
 type Message = {
   id: string;
@@ -57,6 +57,7 @@ export function ChatRoom({
   const [dmPeer, setDmPeer] = useState<string | null>(null);
   const [nameMenu, setNameMenu] = useState<string | null>(null);
   const [verifiedNames, setVerifiedNames] = useState<Set<string>>(new Set());
+  const [hideTsNames, setHideTsNames] = useState<Set<string>>(new Set());
   const [settings, setSettings] = useState<AppSettings>(getSettings());
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastSeenIdRef = useRef<string | null>(null);
@@ -86,7 +87,39 @@ export function ChatRoom({
     loadVerified().then((rows) => {
       setVerifiedNames(new Set(rows.map((r) => r.name.toLowerCase())));
     });
+    // Push current local hideTimestamps to server so others see it too
+    if (name) void syncHideTimestamps(name, getSettings().hideTimestamps);
     return useSettingsListener(setSettings);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name]);
+
+  // Load + subscribe to which users have hide_timestamps enabled
+  useEffect(() => {
+    let active = true;
+    (supabase as any)
+      .from("user_stats")
+      .select("name, hide_timestamps")
+      .eq("hide_timestamps", true)
+      .then(({ data }: { data: Array<{ name: string; hide_timestamps: boolean }> | null }) => {
+        if (active && data) setHideTsNames(new Set(data.map((r) => r.name)));
+      });
+    const ch = supabase
+      .channel("public:user_stats_hidets")
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_stats" }, (payload) => {
+        const row = (payload.new ?? payload.old) as { name?: string; hide_timestamps?: boolean } | null;
+        if (!row?.name) return;
+        setHideTsNames((prev) => {
+          const next = new Set(prev);
+          if ((payload.new as any)?.hide_timestamps) next.add(row.name!);
+          else next.delete(row.name!);
+          return next;
+        });
+      })
+      .subscribe();
+    return () => {
+      active = false;
+      supabase.removeChannel(ch);
+    };
   }, []);
 
   // Anti-close
@@ -386,7 +419,7 @@ export function ChatRoom({
                       {verified && <BadgeCheck className="w-3 h-3 text-primary" />}
                     </button>
                     <span className="opacity-60">· {m.language}</span>
-                    {!(settings.hideTimestamps && mine) && (
+                    {!(mine && settings.hideTimestamps) && !hideTsNames.has(m.name) && (
                       <span className="opacity-60">· {fmtTime(m.created_at)}</span>
                     )}
                     {menuOpen && !mine && m.name !== "Anonymous" && (
@@ -456,7 +489,7 @@ export function ChatRoom({
 
       {showMusic && <MusicPanel onClose={() => setShowMusic(false)} />}
       {showAI && <AIChatPanel onClose={() => setShowAI(false)} />}
-      {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
+      {showSettings && <SettingsPanel name={name} onClose={() => setShowSettings(false)} />}
       {showLevels && <LeaderboardPanel name={name} onClose={() => setShowLevels(false)} />}
       {showAnnouncements && <AnnouncementsPanel name={name} onClose={() => setShowAnnouncements(false)} />}
       {showGames && <GamesPanel name={name} onClose={() => setShowGames(false)} />}
