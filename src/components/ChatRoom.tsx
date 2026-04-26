@@ -456,7 +456,7 @@ export function ChatRoom({
 
       {showMusic && <MusicPanel onClose={() => setShowMusic(false)} />}
       {showAI && <AIChatPanel onClose={() => setShowAI(false)} />}
-      {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
+      {showSettings && <SettingsPanel name={name} onClose={() => setShowSettings(false)} />}
       {showLevels && <LeaderboardPanel name={name} onClose={() => setShowLevels(false)} />}
       {showAnnouncements && <AnnouncementsPanel name={name} onClose={() => setShowAnnouncements(false)} />}
       {showGames && <GamesPanel name={name} onClose={() => setShowGames(false)} />}
