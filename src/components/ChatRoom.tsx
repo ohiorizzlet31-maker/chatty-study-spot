@@ -139,12 +139,15 @@ export function ChatRoom({
     (supabase as any)
       .from("messages")
       .select("*")
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
       .limit(100)
       .then(({ data }: { data: Message[] | null }) => {
         if (active && data) {
-          setMessages(data);
-          lastSeenIdRef.current = data[data.length - 1]?.id ?? null;
+          // We fetched newest-first to avoid being capped to ancient history;
+          // reverse so the chat reads oldest -> newest like before.
+          const ordered = [...data].reverse();
+          setMessages(ordered);
+          lastSeenIdRef.current = ordered[ordered.length - 1]?.id ?? null;
         }
       });
 
