@@ -3,8 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { X, Megaphone, Lock, BadgeCheck } from "lucide-react";
+import { X, Megaphone, Lock, BadgeCheck, Trash2 } from "lucide-react";
 import { isVerifiedName, checkVerifiedPassword } from "@/lib/verified";
+import { isOwner } from "@/lib/device";
 
 type Announcement = { id: string; author: string; content: string; created_at: string };
 
@@ -16,6 +17,7 @@ export function AnnouncementsPanel({ name, onClose }: { name: string; onClose: (
   const [pwError, setPwError] = useState("");
   const [canTry, setCanTry] = useState(false);
   const [checking, setChecking] = useState(false);
+  const owner = isOwner(name);
 
   useEffect(() => {
     isVerifiedName(name).then(setCanTry);
@@ -36,6 +38,10 @@ export function AnnouncementsPanel({ name, onClose }: { name: string; onClose: (
       .channel("public:announcements")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "announcements" }, (payload) => {
         setItems((prev) => [payload.new as Announcement, ...prev]);
+      })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "announcements" }, (payload) => {
+        const removed = payload.old as { id?: string };
+        if (removed?.id) setItems((prev) => prev.filter((a) => a.id !== removed.id));
       })
       .subscribe();
 
@@ -64,6 +70,14 @@ export function AnnouncementsPanel({ name, onClose }: { name: string; onClose: (
     if (!c) return;
     setContent("");
     const { error } = await (supabase as any).from("announcements").insert({ author: name, content: c });
+    if (error) console.error(error);
+  }
+
+  async function remove(id: string) {
+    if (!owner) return;
+    if (!confirm("Delete this announcement?")) return;
+    setItems((prev) => prev.filter((a) => a.id !== id));
+    const { error } = await (supabase as any).from("announcements").delete().eq("id", id);
     if (error) console.error(error);
   }
 
@@ -109,7 +123,18 @@ export function AnnouncementsPanel({ name, onClose }: { name: string; onClose: (
                   {a.author}
                   <BadgeCheck className="w-4 h-4 text-primary" />
                 </p>
-                <p className="text-xs text-muted-foreground">{new Date(a.created_at).toLocaleString()}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground">{new Date(a.created_at).toLocaleString()}</p>
+                  {owner && (
+                    <button
+                      onClick={() => remove(a.id)}
+                      className="text-muted-foreground hover:text-destructive p-1 rounded"
+                      title="Delete announcement"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
               <p className="whitespace-pre-wrap break-words text-sm">{a.content}</p>
             </div>
