@@ -1112,10 +1112,11 @@ export function MiniMinecraft() {
   const s = stateRef.current;
   const types: Block[] = ["dirt","stone","wood","plank","leaves","grass","crafting","chest"];
 
-  function craft(recipe: { name: Block; cost: Record<string, number> }) {
+  function craft(recipe: { name: Block; cost: Partial<Record<string, number>> }) {
     const sCur = stateRef.current;
-    if (Object.entries(recipe.cost).every(([k, v]) => (sCur.inv[k] || 0) >= v)) {
-      Object.entries(recipe.cost).forEach(([k, v]) => { sCur.inv[k] -= v; });
+    const entries = Object.entries(recipe.cost) as Array<[string, number]>;
+    if (entries.every(([k, v]) => (sCur.inv[k] || 0) >= v)) {
+      entries.forEach(([k, v]) => { sCur.inv[k] -= v; });
       sCur.inv[recipe.name] = (sCur.inv[recipe.name] || 0) + 1;
       rerender();
     }
