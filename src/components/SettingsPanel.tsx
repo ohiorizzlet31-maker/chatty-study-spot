@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X } from "lucide-react";
-import { getSettings, saveSettings, AppSettings } from "@/lib/settings";
+import { getSettings, saveSettings, AppSettings, syncHideTimestamps } from "@/lib/settings";
 import { Keyboard } from "lucide-react";
 
 const CLOAKS = [
@@ -76,7 +76,7 @@ export function maybeAutoLaunchCloak() {
   }
 }
 
-export function SettingsPanel({ onClose }: { onClose: () => void }) {
+export function SettingsPanel({ onClose, name }: { onClose: () => void; name?: string }) {
   const [customName, setCustomName] = useState("");
   const [settings, setSettings] = useState<AppSettings>(getSettings());
 
@@ -88,6 +88,9 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
     const next = { ...settings, [key]: value };
     setSettings(next);
     saveSettings(next);
+    if (key === "hideTimestamps" && name) {
+      void syncHideTimestamps(name, value as boolean);
+    }
   }
 
   function applyCloak(name: string, favicon?: string) {
