@@ -10,6 +10,7 @@ export type AppSettings = {
   panicKey: string;
   notifyOnMessage: boolean;
   theme: "light" | "dark" | "oled";
+  language: string;
 };
 
 const KEY = "studyroom_settings";
@@ -23,6 +24,7 @@ const DEFAULTS: AppSettings = {
   panicKey: "`",
   notifyOnMessage: false,
   theme: "light",
+  language: "English",
 };
 
 export function getSettings(): AppSettings {
