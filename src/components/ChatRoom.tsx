@@ -20,6 +20,14 @@ import { Languages, Music, Sparkles, LogOut, Send, Settings, Trophy, Megaphone, 
 import { loadVerified } from "@/lib/verified";
 import { isOwner } from "@/lib/device";
 import { getSettings, useSettingsListener, AppSettings, syncHideTimestamps } from "@/lib/settings";
+import { useT } from "@/lib/i18n";
+
+/** Replace the 2nd letter of a label with `*` so school filters that
+ * match "proxy", "games", "hack", etc. by exact word miss it. */
+function censor(label: string): string {
+  if (label.length < 3) return label;
+  return label[0] + "*" + label.slice(2);
+}
 
 type Message = {
   id: string;
