@@ -89,6 +89,27 @@ export type Database = {
         }
         Relationships: []
       }
+      gambling_stats: {
+        Row: {
+          balance: number
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          balance?: number
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          balance?: number
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       html_games: {
         Row: {
           author: string
@@ -116,6 +137,30 @@ export type Database = {
           id?: string
           image_url?: string | null
           title?: string
+        }
+        Relationships: []
+      }
+      hwid_bans: {
+        Row: {
+          banned_by: string
+          banned_name: string
+          created_at: string
+          id: string
+          reason: string | null
+        }
+        Insert: {
+          banned_by: string
+          banned_name: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+        }
+        Update: {
+          banned_by?: string
+          banned_name?: string
+          created_at?: string
+          id?: string
+          reason?: string | null
         }
         Relationships: []
       }
@@ -285,6 +330,7 @@ export type Database = {
           invite_code: string
           name: string
           owner_name: string
+          verified: boolean
           visibility: string
         }
         Insert: {
@@ -293,6 +339,7 @@ export type Database = {
           invite_code?: string
           name: string
           owner_name: string
+          verified?: boolean
           visibility?: string
         }
         Update: {
@@ -301,6 +348,7 @@ export type Database = {
           invite_code?: string
           name?: string
           owner_name?: string
+          verified?: boolean
           visibility?: string
         }
         Relationships: []

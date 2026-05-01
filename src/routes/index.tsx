@@ -1,11 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
 import { StudyTips } from "@/components/StudyTips";
+import { Blocked } from "@/components/Blocked";
 import { SecretGate } from "@/components/SecretGate";
 import { ChatRoom } from "@/components/ChatRoom";
 import { AppleBoot } from "@/components/AppleBoot";
 import { applySavedCloak, maybeAutoLaunchCloak } from "@/components/SettingsPanel";
 import { getSettings, useSettingsListener, applyTheme } from "@/lib/settings";
+import { supabase } from "@/integrations/supabase/client";
 
 type Stage = "tips" | "password" | "setup" | "boot" | "chat" | "panic";
 const STORAGE_KEY = "studyroom_profile";
@@ -26,6 +28,7 @@ function Index() {
   const [profile, setProfile] = useState<{ name: string; language: string } | null>(null);
   const [prePanicStage, setPrePanicStage] = useState<Stage>("chat");
   const [panicKey, setPanicKey] = useState(getSettings().panicKey || "`");
+  const [banned, setBanned] = useState<string | null>(null);
 
   // Apply tab cloak + restore saved chat session on mount
   useEffect(() => {
@@ -37,8 +40,21 @@ function Index() {
       try {
         const p = JSON.parse(saved);
         if (p.name && p.language) {
-          setProfile(p);
-          setStage("boot");
+          // Check ban list — if banned, stay on the landing & wipe profile.
+          (async () => {
+            const { data } = await (supabase as any)
+              .from("hwid_bans")
+              .select("banned_name,reason")
+              .ilike("banned_name", p.name)
+              .maybeSingle();
+            if (data) {
+              localStorage.removeItem(STORAGE_KEY);
+              setBanned(data.reason || "You have been banned.");
+              return;
+            }
+            setProfile(p);
+            setStage("boot");
+          })();
         }
       } catch {}
     }
@@ -111,12 +127,18 @@ function Index() {
 
   return (
     <>
-      <StudyTips eightCount={eightCount} />
+      <Blocked eightCount={eightCount} />
       {(stage === "password" || stage === "setup") && (
         <SecretGate
           stage={stage}
           onPasswordOk={() => setStage("setup")}
           onSetupComplete={(name, language) => {
+            // also persist language as the active UI language
+            try {
+              const cur = JSON.parse(localStorage.getItem("studyroom_settings") || "{}");
+              localStorage.setItem("studyroom_settings", JSON.stringify({ ...cur, language }));
+              window.dispatchEvent(new CustomEvent("studyroom-settings-changed"));
+            } catch {}
             const p = { name, language };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
             setProfile(p);
@@ -124,6 +146,26 @@ function Index() {
           }}
           onCancel={() => setStage("tips")}
         />
+      )}
+      {banned && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 99999,
+          background: "rgba(0,0,0,0.85)", color: "#fff",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 24, fontFamily: "system-ui",
+        }}>
+          <div style={{ maxWidth: 460, textAlign: "center" }}>
+            <p style={{ fontSize: 48, marginBottom: 12 }}>🚫</p>
+            <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>You're banned</h2>
+            <p style={{ opacity: 0.8, marginBottom: 16 }}>{banned}</p>
+            <button
+              onClick={() => setBanned(null)}
+              style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #555", background: "transparent", color: "#fff", cursor: "pointer" }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
       )}
     </>
   );
