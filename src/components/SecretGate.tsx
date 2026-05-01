@@ -154,6 +154,7 @@ export function SecretGate({
                 </button>
               ))}
             </div>
+            {verifyError && <p className="text-destructive text-sm mb-3">{verifyError}</p>}
             <Button type="submit" disabled={!name.trim() || !language || checking} className="w-full">
               {checking ? "Checking…" : "Enter chat →"}
             </Button>
