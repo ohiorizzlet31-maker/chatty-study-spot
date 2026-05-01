@@ -364,38 +364,38 @@ export function ChatRoom({
           </div>
           <div className="flex items-center gap-1 flex-wrap justify-end">
             <Button variant="ghost" size="sm" onClick={() => setShowServers(true)}>
-              <ServerIcon className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Servers</span>
+              <ServerIcon className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">{censor(tt("servers"))}</span>
             </Button>
             <Button variant="ghost" size="sm" onClick={() => { setDmPeer(null); setShowDMs(true); }}>
-              <MessageSquare className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">DMs</span>
+              <MessageSquare className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">{tt("dms")}</span>
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setShowAnnouncements(true)}>
-              <Megaphone className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">News</span>
+              <Megaphone className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">{censor(tt("news"))}</span>
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setShowLevels(true)}>
-              <Trophy className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Levels</span>
+              <Trophy className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">{censor(tt("levels"))}</span>
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setShowGames(true)}>
-              <Gamepad2 className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Games</span>
+              <Gamepad2 className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">{censor(tt("games"))}</span>
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setShowMusic(true)}>
-              <Music className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Music</span>
+              <Music className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">{censor(tt("music"))}</span>
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setShowAI(true)}>
-              <Sparkles className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">AI</span>
+              <Sparkles className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">{tt("ai")}</span>
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setShowHtmlRunner(true)}>
-              <Code className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">HTML</span>
+              <Code className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">{censor(tt("html"))}</span>
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setShowWebsite(true)}>
-              <Globe className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Website</span>
+              <Globe className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">{censor(tt("website"))}</span>
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setShowProxy(true)}>
-              <Shield className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Proxy</span>
+              <Shield className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">{censor(tt("proxy"))}</span>
             </Button>
             {isVerified && (
               <Button variant="ghost" size="sm" onClick={() => setShowLogs(true)}>
-                <FileText className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Logs</span>
+                <FileText className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">{censor(tt("logs"))}</span>
               </Button>
             )}
             <Button variant="ghost" size="sm" onClick={() => setShowSettings(true)}>
