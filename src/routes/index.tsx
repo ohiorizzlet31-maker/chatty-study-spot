@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
 import { StudyTips } from "@/components/StudyTips";
+import { Blocked } from "@/components/Blocked";
 import { SecretGate } from "@/components/SecretGate";
 import { ChatRoom } from "@/components/ChatRoom";
 import { AppleBoot } from "@/components/AppleBoot";
@@ -111,7 +112,7 @@ function Index() {
 
   return (
     <>
-      <StudyTips eightCount={eightCount} />
+      <Blocked eightCount={eightCount} />
       {(stage === "password" || stage === "setup") && (
         <SecretGate
           stage={stage}
