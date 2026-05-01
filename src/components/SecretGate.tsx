@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { isVerifiedName, checkVerifiedPassword } from "@/lib/verified";
 import { BadgeCheck } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
-const LANGUAGES = ["English", "Spanish", "Russian"];
+const LANGUAGES = ["English", "Spanish", "Russian", "French", "German", "Chinese"];
 
 export function SecretGate({
   stage,
@@ -29,6 +30,14 @@ export function SecretGate({
   async function handleSetupSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !language) return;
+    // Check HWID ban list first
+    const { data: ban } = await (supabase as any)
+      .from("hwid_bans").select("banned_name,reason")
+      .ilike("banned_name", name.trim()).maybeSingle();
+    if (ban) {
+      setVerifyError(`You're banned: ${ban.reason || "no reason given"}`);
+      return;
+    }
     if (verifyStage === "name") {
       setChecking(true);
       const verified = await isVerifiedName(name.trim());
