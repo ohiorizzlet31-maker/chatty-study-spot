@@ -7,6 +7,7 @@ import { ChatRoom } from "@/components/ChatRoom";
 import { AppleBoot } from "@/components/AppleBoot";
 import { applySavedCloak, maybeAutoLaunchCloak } from "@/components/SettingsPanel";
 import { getSettings, useSettingsListener, applyTheme } from "@/lib/settings";
+import { supabase } from "@/integrations/supabase/client";
 
 type Stage = "tips" | "password" | "setup" | "boot" | "chat" | "panic";
 const STORAGE_KEY = "studyroom_profile";
@@ -27,6 +28,7 @@ function Index() {
   const [profile, setProfile] = useState<{ name: string; language: string } | null>(null);
   const [prePanicStage, setPrePanicStage] = useState<Stage>("chat");
   const [panicKey, setPanicKey] = useState(getSettings().panicKey || "`");
+  const [banned, setBanned] = useState<string | null>(null);
 
   // Apply tab cloak + restore saved chat session on mount
   useEffect(() => {
@@ -38,8 +40,21 @@ function Index() {
       try {
         const p = JSON.parse(saved);
         if (p.name && p.language) {
-          setProfile(p);
-          setStage("boot");
+          // Check ban list — if banned, stay on the landing & wipe profile.
+          (async () => {
+            const { data } = await (supabase as any)
+              .from("hwid_bans")
+              .select("banned_name,reason")
+              .ilike("banned_name", p.name)
+              .maybeSingle();
+            if (data) {
+              localStorage.removeItem(STORAGE_KEY);
+              setBanned(data.reason || "You have been banned.");
+              return;
+            }
+            setProfile(p);
+            setStage("boot");
+          })();
         }
       } catch {}
     }
