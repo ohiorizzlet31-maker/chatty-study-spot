@@ -133,6 +133,12 @@ function Index() {
           stage={stage}
           onPasswordOk={() => setStage("setup")}
           onSetupComplete={(name, language) => {
+            // also persist language as the active UI language
+            try {
+              const cur = JSON.parse(localStorage.getItem("studyroom_settings") || "{}");
+              localStorage.setItem("studyroom_settings", JSON.stringify({ ...cur, language }));
+              window.dispatchEvent(new CustomEvent("studyroom-settings-changed"));
+            } catch {}
             const p = { name, language };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
             setProfile(p);
@@ -140,6 +146,26 @@ function Index() {
           }}
           onCancel={() => setStage("tips")}
         />
+      )}
+      {banned && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 99999,
+          background: "rgba(0,0,0,0.85)", color: "#fff",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 24, fontFamily: "system-ui",
+        }}>
+          <div style={{ maxWidth: 460, textAlign: "center" }}>
+            <p style={{ fontSize: 48, marginBottom: 12 }}>🚫</p>
+            <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>You're banned</h2>
+            <p style={{ opacity: 0.8, marginBottom: 16 }}>{banned}</p>
+            <button
+              onClick={() => setBanned(null)}
+              style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #555", background: "transparent", color: "#fff", cursor: "pointer" }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
       )}
     </>
   );
