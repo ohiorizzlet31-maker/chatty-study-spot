@@ -74,6 +74,7 @@ export function ChatRoom({
   const [cooldownLeft, setCooldownLeft] = useState(0);
   const [adminPrompt, setAdminPrompt] = useState(false);
   const [adminAgreed, setAdminAgreed] = useState(false);
+  const tt = useT();
 
   const COOLDOWN_MS = 3000;
 
