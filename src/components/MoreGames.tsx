@@ -1,5 +1,34 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+
+/* =================================================================== */
+/* Shared gambling balance helpers (synced to gambling_stats table)    */
+/* =================================================================== */
+const G_KEY = "gambling_balance_v1";
+function loadGBalance(): number {
+  const v = Number(localStorage.getItem(G_KEY));
+  return Number.isFinite(v) && v > 0 ? v : 50;
+}
+function saveGBalance(v: number) {
+  localStorage.setItem(G_KEY, String(v));
+  const name = (() => {
+    try { return JSON.parse(localStorage.getItem("studyroom_profile") || "{}").name as string | undefined; }
+    catch { return undefined; }
+  })();
+  if (!name) return;
+  // upsert to gambling_stats so leaderboard works
+  (supabase as any).from("gambling_stats").upsert(
+    { name, balance: Math.round(v * 100) / 100, updated_at: new Date().toISOString() },
+    { onConflict: "name" },
+  ).then(() => {}, () => {});
+}
+function useGBalance(): [number, (n: number) => void, () => void] {
+  const [b, setB] = useState(loadGBalance);
+  const set = (n: number) => { const r = Math.round(n * 100) / 100; setB(r); saveGBalance(r); };
+  const reset = () => set(50);
+  return [b, set, reset];
+}
 
 /* =================================================================== */
 /* DINO — Chrome Dinosaur                                              */
