@@ -249,10 +249,7 @@ export function Minesweeper() {
 /* =================================================================== */
 export function Plinko() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [balance, setBalance] = useState(() => {
-    const s = Number(localStorage.getItem("plinko_balance"));
-    return Number.isFinite(s) && s > 0 ? s : 50;
-  });
+  const [balance, setBalance, resetBalance] = useGBalance();
   const [bet, setBet] = useState(5);
   const ballsRef = useRef<Array<{ x: number; y: number; vx: number; vy: number; bet: number }>>([]);
   const [lastWin, setLastWin] = useState<string>("");
@@ -262,8 +259,6 @@ export function Plinko() {
   const PEG_R = 4;
   const BALL_R = 6;
   const slotMultipliers = [5, 2, 1, 0.5, 0.2, 0.5, 1, 2, 5];
-
-  useEffect(() => { localStorage.setItem("plinko_balance", String(balance)); }, [balance]);
 
   const pegs = useRef<Array<{x:number;y:number}>>([]);
   if (pegs.current.length === 0) {
@@ -278,7 +273,7 @@ export function Plinko() {
 
   function drop() {
     if (balance < bet || bet <= 0) return;
-    setBalance(b => b - bet);
+    setBalance(balance - bet);
     ballsRef.current.push({ x: W/2 + (Math.random()-0.5)*20, y: 10, vx: (Math.random()-0.5)*0.5, vy: 0, bet });
   }
 
@@ -327,7 +322,8 @@ export function Plinko() {
         if (ball.y >= slotY) {
           const idx = Math.max(0, Math.min(slotMultipliers.length - 1, Math.floor(ball.x / slotW)));
           const win = Math.round(ball.bet * slotMultipliers[idx] * 100) / 100;
-          setBalance(b => Math.round((b + win) * 100) / 100);
+          // read fresh from localStorage to avoid stale closure
+          setBalance(loadGBalance() + win);
           setLastWin(`${slotMultipliers[idx]}x · +$${win.toFixed(2)}`);
         } else {
           survivors.push(ball);
@@ -342,10 +338,7 @@ export function Plinko() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  function reset() {
-    setBalance(50); setLastWin("");
-    localStorage.setItem("plinko_balance", "50");
-  }
+  function reset() { resetBalance(); setLastWin(""); }
 
   return (
     <div className="space-y-3">
