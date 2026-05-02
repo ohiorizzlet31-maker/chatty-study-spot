@@ -483,6 +483,435 @@ export function MinesGame() {
 }
 
 /* =================================================================== */
+/* HANGMAN                                                             */
+/* =================================================================== */
+const HANGMAN_WORDS = [
+  "javascript","computer","keyboard","monitor","internet","developer","function",
+  "homework","backpack","textbook","calculator","pencil","library","teacher",
+  "lemonade","sandwich","skateboard","mountain","airplane","whisper","puzzle",
+  "kingdom","dragon","wizard","castle","unicorn","penguin","dolphin","octopus",
+];
+export function Hangman() {
+  const [word, setWord] = useState(() => HANGMAN_WORDS[Math.floor(Math.random()*HANGMAN_WORDS.length)]);
+  const [guessed, setGuessed] = useState<Set<string>>(new Set());
+  const [wrong, setWrong] = useState(0);
+  const MAX = 6;
+
+  const display = word.split("").map(c => guessed.has(c) ? c : "_").join(" ");
+  const won = word.split("").every(c => guessed.has(c));
+  const lost = wrong >= MAX;
+
+  function guess(c: string) {
+    if (won || lost || guessed.has(c)) return;
+    const next = new Set(guessed); next.add(c);
+    setGuessed(next);
+    if (!word.includes(c)) setWrong(w => w + 1);
+  }
+
+  function reset() {
+    setWord(HANGMAN_WORDS[Math.floor(Math.random()*HANGMAN_WORDS.length)]);
+    setGuessed(new Set()); setWrong(0);
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      if (/^[a-z]$/.test(k)) guess(k);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  return (
+    <div className="space-y-4 text-center">
+      <svg width="180" height="200" className="mx-auto">
+        <line x1="20" y1="190" x2="160" y2="190" stroke="currentColor" strokeWidth="3" />
+        <line x1="50" y1="190" x2="50" y2="20" stroke="currentColor" strokeWidth="3" />
+        <line x1="50" y1="20" x2="120" y2="20" stroke="currentColor" strokeWidth="3" />
+        <line x1="120" y1="20" x2="120" y2="40" stroke="currentColor" strokeWidth="3" />
+        {wrong > 0 && <circle cx="120" cy="55" r="15" stroke="currentColor" strokeWidth="3" fill="none" />}
+        {wrong > 1 && <line x1="120" y1="70" x2="120" y2="120" stroke="currentColor" strokeWidth="3" />}
+        {wrong > 2 && <line x1="120" y1="80" x2="100" y2="100" stroke="currentColor" strokeWidth="3" />}
+        {wrong > 3 && <line x1="120" y1="80" x2="140" y2="100" stroke="currentColor" strokeWidth="3" />}
+        {wrong > 4 && <line x1="120" y1="120" x2="100" y2="150" stroke="currentColor" strokeWidth="3" />}
+        {wrong > 5 && <line x1="120" y1="120" x2="140" y2="150" stroke="currentColor" strokeWidth="3" />}
+      </svg>
+      <p className="text-3xl font-mono tracking-widest font-bold">{display}</p>
+      <p className="text-sm text-muted-foreground">Wrong guesses: {wrong}/{MAX}</p>
+      <div className="grid grid-cols-9 gap-1 max-w-md mx-auto">
+        {"abcdefghijklmnopqrstuvwxyz".split("").map(c => (
+          <button
+            key={c}
+            onClick={() => guess(c)}
+            disabled={guessed.has(c) || won || lost}
+            className={`h-9 rounded-md border text-sm font-semibold uppercase ${guessed.has(c) ? (word.includes(c) ? "bg-emerald-500/30 border-emerald-500" : "bg-destructive/30 border-destructive opacity-50") : "bg-muted hover:bg-muted/70 border-border"}`}
+          >{c}</button>
+        ))}
+      </div>
+      {(won || lost) && (
+        <div>
+          <p className="font-bold text-lg">{won ? "🎉 You won!" : `💀 The word was: ${word}`}</p>
+          <Button onClick={reset} className="mt-2">New word</Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =================================================================== */
+/* CRASH — gambling                                                    */
+/* =================================================================== */
+export function Crash() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [balance, setBalance, resetBalance] = useGBalance();
+  const [bet, setBet] = useState(5);
+  const [autoCashout, setAutoCashout] = useState(2);
+  const [phase, setPhase] = useState<"idle"|"flying"|"crashed">("idle");
+  const [mult, setMult] = useState(1);
+  const [crashAt, setCrashAt] = useState(0);
+  const [lastWin, setLastWin] = useState("");
+  const stateRef = useRef({ start: 0, crashAt: 0, points: [] as Array<[number,number]>, cashedOut: false });
+
+  function start() {
+    if (phase === "flying" || balance < bet || bet <= 0) return;
+    setBalance(balance - bet);
+    // crash point: ~1% house edge — distribution from Bustabit-style formula
+    // P(X >= m) = 0.99 / m  =>  X = 0.99 / U where U uniform(0,1)
+    const u = Math.random();
+    const c = Math.max(1.0, Math.floor((0.99 / Math.max(0.0001, u)) * 100) / 100);
+    stateRef.current.crashAt = c;
+    stateRef.current.start = performance.now();
+    stateRef.current.points = [];
+    stateRef.current.cashedOut = false;
+    setCrashAt(c);
+    setMult(1);
+    setLastWin("");
+    setPhase("flying");
+  }
+
+  function cashout() {
+    if (phase !== "flying" || stateRef.current.cashedOut) return;
+    stateRef.current.cashedOut = true;
+    const m = mult;
+    const win = Math.round(bet * m * 100) / 100;
+    setBalance(loadGBalance() + win);
+    setLastWin(`✅ Cashed out @ ${m.toFixed(2)}x → +$${win.toFixed(2)}`);
+  }
+
+  useEffect(() => {
+    const c = canvasRef.current!; const ctx = c.getContext("2d")!;
+    const W = 480, H = 240;
+    let raf = 0;
+    const tick = () => {
+      ctx.fillStyle = "#0a0a14"; ctx.fillRect(0, 0, W, H);
+      // grid
+      ctx.strokeStyle = "rgba(255,255,255,0.05)";
+      for (let i = 0; i < 10; i++) {
+        ctx.beginPath(); ctx.moveTo(0, i*H/10); ctx.lineTo(W, i*H/10); ctx.stroke();
+      }
+      const s = stateRef.current;
+      if (phase === "flying") {
+        const t = (performance.now() - s.start) / 1000;
+        const m = Math.pow(Math.E, 0.18 * t);
+        if (m >= s.crashAt) {
+          setMult(s.crashAt);
+          setPhase("crashed");
+          if (!s.cashedOut) setLastWin(`💥 Crashed @ ${s.crashAt.toFixed(2)}x — lost $${bet.toFixed(2)}`);
+        } else {
+          setMult(Math.round(m * 100) / 100);
+          // auto cashout
+          if (!s.cashedOut && autoCashout > 0 && m >= autoCashout) cashout();
+        }
+        s.points.push([t, m]);
+      }
+      // draw curve
+      if (s.points.length > 1) {
+        const maxT = Math.max(2, s.points[s.points.length-1][0] * 1.1);
+        const maxM = Math.max(2, s.points[s.points.length-1][1] * 1.05);
+        ctx.strokeStyle = phase === "crashed" ? "#ef4444" : "#22c55e";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        s.points.forEach(([t, m], i) => {
+          const x = (t / maxT) * W;
+          const y = H - ((m - 1) / (maxM - 1)) * H;
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      }
+      // mult text
+      ctx.fillStyle = phase === "crashed" ? "#ef4444" : "#fff";
+      ctx.font = "bold 48px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(`${mult.toFixed(2)}x`, W/2, H/2);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [phase, mult, bet, autoCashout]);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-between items-center flex-wrap gap-2">
+        <p className="text-2xl font-bold">${balance.toFixed(2)} <span className="text-xs text-muted-foreground">(fake)</span></p>
+        <Button size="sm" variant="outline" onClick={resetBalance}>Reset to $50</Button>
+      </div>
+      <canvas ref={canvasRef} width={480} height={240} className="rounded-xl border border-border max-w-full block mx-auto" style={{ width: "100%", maxWidth: 480 }} />
+      {lastWin && <p className="text-center text-sm font-medium">{lastWin}</p>}
+      <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl border border-border bg-muted/30">
+        <label className="text-sm">Bet $</label>
+        <input type="number" min={1} max={Math.max(1, Math.floor(balance))} value={bet} onChange={(e) => setBet(Math.max(1, Number(e.target.value)||1))} disabled={phase === "flying"} className="w-20 h-8 px-2 rounded-md border border-border bg-background text-sm" />
+        <label className="text-sm ml-2">Auto cashout</label>
+        <input type="number" step={0.1} min={1.01} value={autoCashout} onChange={(e) => setAutoCashout(Number(e.target.value)||0)} disabled={phase === "flying"} className="w-20 h-8 px-2 rounded-md border border-border bg-background text-sm" />
+        <span className="text-xs text-muted-foreground">x (0 = manual)</span>
+        {phase !== "flying" ? (
+          <Button onClick={start} disabled={balance < bet} className="ml-auto">Place bet</Button>
+        ) : (
+          <Button onClick={cashout} disabled={stateRef.current.cashedOut} className="ml-auto" variant="default">Cashout @ {mult.toFixed(2)}x</Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* =================================================================== */
+/* ROULETTE — gambling                                                 */
+/* =================================================================== */
+const ROULETTE_NUMS = [0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26];
+const RED = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
+function colorOf(n: number) { return n === 0 ? "green" : RED.has(n) ? "red" : "black"; }
+
+export function Roulette() {
+  const [balance, setBalance, resetBalance] = useGBalance();
+  const [bet, setBet] = useState(5);
+  const [bets, setBets] = useState<{ red: number; black: number; green: number; even: number; odd: number; low: number; high: number; numbers: Record<number, number> }>(
+    { red: 0, black: 0, green: 0, even: 0, odd: 0, low: 0, high: 0, numbers: {} }
+  );
+  const [spinning, setSpinning] = useState(false);
+  const [result, setResult] = useState<number | null>(null);
+  const [msg, setMsg] = useState("");
+
+  const total = bets.red + bets.black + bets.green + bets.even + bets.odd + bets.low + bets.high
+    + Object.values(bets.numbers).reduce((a,b) => a+b, 0);
+
+  function place(field: keyof typeof bets, num?: number) {
+    if (spinning || balance < bet) return;
+    setBalance(balance - bet);
+    setBets(prev => {
+      const n = { ...prev, numbers: { ...prev.numbers } };
+      if (field === "numbers" && num !== undefined) n.numbers[num] = (n.numbers[num] || 0) + bet;
+      else (n as any)[field] = (n as any)[field] + bet;
+      return n;
+    });
+  }
+
+  function clearBets() {
+    if (spinning) return;
+    setBalance(balance + total);
+    setBets({ red: 0, black: 0, green: 0, even: 0, odd: 0, low: 0, high: 0, numbers: {} });
+  }
+
+  function spin() {
+    if (spinning || total === 0) return;
+    setSpinning(true);
+    setMsg("");
+    setResult(null);
+    const winner = ROULETTE_NUMS[Math.floor(Math.random() * ROULETTE_NUMS.length)];
+    let ticks = 0;
+    const interval = setInterval(() => {
+      setResult(ROULETTE_NUMS[Math.floor(Math.random() * ROULETTE_NUMS.length)]);
+      ticks++;
+      if (ticks > 25) {
+        clearInterval(interval);
+        setResult(winner);
+        // payouts
+        let win = 0;
+        const c = colorOf(winner);
+        if (c === "red") win += bets.red * 2;
+        if (c === "black") win += bets.black * 2;
+        if (c === "green") win += bets.green * 14;
+        if (winner !== 0 && winner % 2 === 0) win += bets.even * 2;
+        if (winner % 2 === 1) win += bets.odd * 2;
+        if (winner >= 1 && winner <= 18) win += bets.low * 2;
+        if (winner >= 19 && winner <= 36) win += bets.high * 2;
+        win += (bets.numbers[winner] || 0) * 36;
+        if (win > 0) {
+          setBalance(loadGBalance() + win);
+          setMsg(`🎉 ${winner} ${c} — won $${win.toFixed(2)}`);
+        } else {
+          setMsg(`😞 ${winner} ${c} — no win`);
+        }
+        setBets({ red: 0, black: 0, green: 0, even: 0, odd: 0, low: 0, high: 0, numbers: {} });
+        setSpinning(false);
+      }
+    }, 80);
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-between items-center flex-wrap gap-2">
+        <p className="text-2xl font-bold">${balance.toFixed(2)} <span className="text-xs text-muted-foreground">(fake)</span></p>
+        <Button size="sm" variant="outline" onClick={resetBalance}>Reset to $50</Button>
+      </div>
+
+      {/* Wheel display */}
+      <div className="text-center p-6 rounded-2xl border-4" style={{ borderColor: result !== null ? (colorOf(result) === "red" ? "#ef4444" : colorOf(result) === "black" ? "#222" : "#22c55e") : "transparent", background: "var(--muted)" }}>
+        <p className="text-6xl font-bold font-mono">{result === null ? "—" : result}</p>
+        <p className="text-sm mt-1 capitalize">{result !== null ? colorOf(result) : "place your bets"}</p>
+      </div>
+      {msg && <p className="text-center font-semibold">{msg}</p>}
+
+      {/* Number grid */}
+      <div className="grid grid-cols-12 gap-1 text-xs">
+        <button
+          onClick={() => place("numbers", 0)}
+          disabled={spinning || balance < bet}
+          className="col-span-12 h-8 rounded bg-emerald-600 text-white font-bold relative"
+        >
+          0 {(bets.numbers[0] || 0) > 0 && <span className="absolute top-0 right-1 text-[9px]">${bets.numbers[0]}</span>}
+        </button>
+        {Array.from({length: 36}, (_, i) => i + 1).map(n => (
+          <button
+            key={n}
+            onClick={() => place("numbers", n)}
+            disabled={spinning || balance < bet}
+            className={`h-8 rounded text-white font-bold relative ${RED.has(n) ? "bg-red-600" : "bg-zinc-800"}`}
+          >
+            {n}
+            {(bets.numbers[n] || 0) > 0 && <span className="absolute top-0 right-0 text-[9px] bg-yellow-400 text-black rounded-bl px-0.5">${bets.numbers[n]}</span>}
+          </button>
+        ))}
+      </div>
+
+      {/* Outside bets */}
+      <div className="grid grid-cols-7 gap-1 text-xs">
+        {([
+          ["red","Red 2x","bg-red-600 text-white"],
+          ["black","Black 2x","bg-zinc-800 text-white"],
+          ["green","Green 14x","bg-emerald-600 text-white"],
+          ["even","Even 2x","bg-muted"],
+          ["odd","Odd 2x","bg-muted"],
+          ["low","1-18 2x","bg-muted"],
+          ["high","19-36 2x","bg-muted"],
+        ] as const).map(([k, label, cls]) => (
+          <button
+            key={k}
+            onClick={() => place(k)}
+            disabled={spinning || balance < bet}
+            className={`h-10 rounded font-bold ${cls} relative`}
+          >
+            {label}
+            {((bets as any)[k] || 0) > 0 && <span className="absolute top-0 right-0 text-[9px] bg-yellow-400 text-black rounded-bl px-1">${(bets as any)[k]}</span>}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl border border-border bg-muted/30">
+        <label className="text-sm">Chip $</label>
+        <input type="number" min={1} value={bet} onChange={(e) => setBet(Math.max(1, Number(e.target.value)||1))} disabled={spinning} className="w-20 h-8 px-2 rounded-md border border-border bg-background text-sm" />
+        <span className="text-xs text-muted-foreground">Total bet: ${total}</span>
+        <Button onClick={clearBets} disabled={spinning || total === 0} variant="outline" size="sm">Clear</Button>
+        <Button onClick={spin} disabled={spinning || total === 0} className="ml-auto">{spinning ? "Spinning…" : "Spin"}</Button>
+      </div>
+    </div>
+  );
+}
+
+/* =================================================================== */
+/* SNAKE with customizable speed                                       */
+/* =================================================================== */
+export function SnakeFast() {
+  const [speed, setSpeed] = useState(120);
+  const [grid, setGrid] = useState(15);
+  const [snake, setSnake] = useState<Array<[number, number]>>([[7,7]]);
+  const [food, setFood] = useState<[number, number]>([3, 3]);
+  const [dir, setDir] = useState<[number, number]>([1, 0]);
+  const [over, setOver] = useState(false);
+  const [score, setScore] = useState(0);
+  const dirRef = useRef(dir); dirRef.current = dir;
+  const snakeRef = useRef(snake); snakeRef.current = snake;
+  const foodRef = useRef(food); foodRef.current = food;
+
+  function reset() {
+    setSnake([[Math.floor(grid/2), Math.floor(grid/2)]]);
+    setFood([Math.floor(Math.random()*grid), Math.floor(Math.random()*grid)]);
+    setDir([1, 0]); setOver(false); setScore(0);
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const map: Record<string, [number, number]> = {
+        ArrowUp: [0,-1], ArrowDown: [0,1], ArrowLeft: [-1,0], ArrowRight: [1,0],
+        w: [0,-1], s: [0,1], a: [-1,0], d: [1,0],
+      };
+      const nd = map[e.key];
+      if (nd) {
+        const [dx, dy] = dirRef.current;
+        if (nd[0] === -dx && nd[1] === -dy) return; // no reverse
+        setDir(nd);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    if (over) return;
+    const t = setInterval(() => {
+      const sn = snakeRef.current;
+      const [hx, hy] = sn[0];
+      const [dx, dy] = dirRef.current;
+      const nx = hx + dx, ny = hy + dy;
+      if (nx < 0 || ny < 0 || nx >= grid || ny >= grid || sn.some(([x,y]) => x===nx && y===ny)) {
+        setOver(true); return;
+      }
+      const ate = nx === foodRef.current[0] && ny === foodRef.current[1];
+      const ns: Array<[number, number]> = [[nx, ny], ...sn];
+      if (!ate) ns.pop();
+      else {
+        setScore(s => s + 1);
+        let nf: [number, number];
+        do { nf = [Math.floor(Math.random()*grid), Math.floor(Math.random()*grid)]; }
+        while (ns.some(([x,y]) => x===nf[0] && y===nf[1]));
+        setFood(nf);
+      }
+      setSnake(ns);
+    }, speed);
+    return () => clearInterval(t);
+  }, [over, speed, grid]);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-3 justify-between">
+        <p className="font-bold">Score: {score}</p>
+        <div className="flex items-center gap-2 text-xs">
+          <label>Speed (ms/tick)</label>
+          <input type="range" min={40} max={300} value={speed} onChange={(e) => setSpeed(Number(e.target.value))} />
+          <span>{speed}</span>
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          <label>Grid</label>
+          <select value={grid} onChange={(e) => { setGrid(Number(e.target.value)); reset(); }} className="h-7 px-2 rounded border border-border bg-background">
+            {[10,15,20,25,30].map(n => <option key={n} value={n}>{n}×{n}</option>)}
+          </select>
+        </div>
+        <Button size="sm" onClick={reset}>{over ? "Restart" : "New"}</Button>
+      </div>
+      <div className="grid mx-auto bg-black p-1 rounded-lg" style={{ gridTemplateColumns: `repeat(${grid}, 1fr)`, width: "min(360px, 90vw)" }}>
+        {Array.from({length: grid*grid}, (_, i) => {
+          const x = i % grid, y = Math.floor(i / grid);
+          const isHead = snake[0]?.[0] === x && snake[0]?.[1] === y;
+          const isBody = !isHead && snake.some(([sx,sy]) => sx===x && sy===y);
+          const isFood = food[0] === x && food[1] === y;
+          return <div key={i} className="aspect-square" style={{ background: isHead ? "#22c55e" : isBody ? "#15803d" : isFood ? "#ef4444" : "#0a0a0a" }} />;
+        })}
+      </div>
+      {over && <p className="text-center font-semibold">Game over · Score {score}</p>}
+      <p className="text-xs text-muted-foreground text-center">WASD or arrows · adjust speed live</p>
+    </div>
+  );
+}
+
+/* =================================================================== */
 /* PONG                                                                */
 /* =================================================================== */
 export function Pong() {
