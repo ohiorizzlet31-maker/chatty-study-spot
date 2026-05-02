@@ -364,36 +364,42 @@ export function Plinko() {
 /* MINES — crypto-style                                                */
 /* =================================================================== */
 export function MinesGame() {
-  const SIZE = 5;
-  const [balance, setBalance] = useState(() => {
-    const s = Number(localStorage.getItem("mines_balance"));
-    return Number.isFinite(s) && s > 0 ? s : 50;
-  });
+  const [size, setSize] = useState(5);
+  const [balance, setBalance, resetBalance] = useGBalance();
   const [bet, setBet] = useState(5);
   const [mineCount, setMineCount] = useState(3);
   const [grid, setGrid] = useState<Array<{ mine: boolean; revealed: boolean }>>([]);
   const [round, setRound] = useState<"idle" | "play" | "lost">("idle");
   const [picked, setPicked] = useState(0);
 
-  useEffect(() => { localStorage.setItem("mines_balance", String(balance)); }, [balance]);
+  // Per-cell payout shrinks as grid grows so big boards pay less per click.
+  // multiplier = product over picks i: total/(total - mines_left_after_i)
+  // We use a smoother capped formula so 2 mines on 5x5 ≈ 1.08x first pick, 1.18x second...
+  function calcMultiplier(p: number) {
+    if (p === 0) return 1;
+    const total = size * size;
+    let m = 1;
+    for (let i = 0; i < p; i++) {
+      m *= (total - i) / (total - mineCount - i);
+    }
+    // House edge of ~5%
+    return Math.round(m * 0.95 * 100) / 100;
+  }
 
   function start() {
     if (balance < bet || bet <= 0) return;
-    setBalance(b => Math.round((b - bet)*100)/100);
-    const cells: number[] = Array.from({length: SIZE*SIZE}, (_, i) => i);
+    if (mineCount >= size * size) return;
+    setBalance(balance - bet);
+    const cells: number[] = Array.from({length: size*size}, (_, i) => i);
     cells.sort(() => Math.random() - 0.5);
     const mines = new Set(cells.slice(0, mineCount));
-    setGrid(Array.from({length: SIZE*SIZE}, (_, i) => ({ mine: mines.has(i), revealed: false })));
+    setGrid(Array.from({length: size*size}, (_, i) => ({ mine: mines.has(i), revealed: false })));
     setPicked(0); setRound("play");
   }
 
-  const safe = SIZE*SIZE - mineCount;
-  const multiplier = picked === 0 ? 1 : (() => {
-    let m = 1;
-    for (let i = 0; i < picked; i++) m *= (safe - i) / (SIZE*SIZE - mineCount - i) * (SIZE*SIZE - i) / (SIZE*SIZE - mineCount - i);
-    // simpler payout: 1 + 0.4*picked * (mineCount/3)
-    return Math.round((1 + picked * 0.35 * (mineCount/2)) * 100) / 100;
-  })();
+  const safe = size*size - mineCount;
+  const multiplier = calcMultiplier(picked);
+  const nextMultiplier = calcMultiplier(picked + 1);
 
   function pick(i: number) {
     if (round !== "play" || grid[i].revealed) return;
@@ -410,12 +416,12 @@ export function MinesGame() {
 
   function cashout(g = grid, p = picked) {
     if (round !== "play" || p === 0) { setRound("idle"); return; }
-    const win = Math.round(bet * (1 + p * 0.35 * (mineCount/2)) * 100) / 100;
-    setBalance(b => Math.round((b + win)*100)/100);
+    const win = Math.round(bet * calcMultiplier(p) * 100) / 100;
+    setBalance(balance + win);
     setRound("idle"); setPicked(0); setGrid([]);
   }
 
-  function reset() { setBalance(50); localStorage.setItem("mines_balance", "50"); setRound("idle"); setGrid([]); setPicked(0); }
+  function reset() { resetBalance(); setRound("idle"); setGrid([]); setPicked(0); }
 
   return (
     <div className="space-y-3">
@@ -427,28 +433,32 @@ export function MinesGame() {
         <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl border border-border bg-muted/30">
           <label className="text-sm">Bet $</label>
           <input type="number" min={1} max={Math.max(1, Math.floor(balance))} value={bet} onChange={(e) => setBet(Math.max(1, Number(e.target.value)||1))} className="w-20 h-8 px-2 rounded-md border border-border bg-background text-sm" />
+          <label className="text-sm ml-2">Grid</label>
+          <select value={size} onChange={(e) => setSize(Number(e.target.value))} className="h-8 px-2 rounded-md border border-border bg-background text-sm">
+            {[3,4,5,6,7,8,10].map(n => <option key={n} value={n}>{n}×{n}</option>)}
+          </select>
           <label className="text-sm ml-2">Mines</label>
           <select value={mineCount} onChange={(e) => setMineCount(Number(e.target.value))} className="h-8 px-2 rounded-md border border-border bg-background text-sm">
-            {[1,2,3,5,7,10].map(n => <option key={n} value={n}>{n}</option>)}
+            {[1,2,3,5,7,10,15,20].filter(n => n < size*size).map(n => <option key={n} value={n}>{n}</option>)}
           </select>
           <Button onClick={start} disabled={balance < bet || bet <= 0} className="ml-auto">Start round</Button>
         </div>
       )}
       {round === "play" && (
-        <div className="flex items-center justify-between text-sm p-2 rounded-lg bg-muted/30">
+        <div className="flex items-center justify-between text-sm p-2 rounded-lg bg-muted/30 flex-wrap gap-2">
           <span>Picked: {picked}/{safe}</span>
-          <span>Multiplier: <b>{multiplier.toFixed(2)}x</b></span>
+          <span>Now: <b>{multiplier.toFixed(2)}x</b> · Next: <b>{nextMultiplier.toFixed(2)}x</b></span>
           <span>Cashout: <b>${(bet * multiplier).toFixed(2)}</b></span>
         </div>
       )}
       {grid.length > 0 && (
-        <div className="grid gap-2 mx-auto" style={{ gridTemplateColumns: `repeat(${SIZE}, 1fr)`, maxWidth: 320 }}>
+        <div className="grid gap-1.5 mx-auto" style={{ gridTemplateColumns: `repeat(${size}, 1fr)`, maxWidth: Math.min(360, size * 50) }}>
           {grid.map((c, i) => (
             <button
               key={i}
               onClick={() => pick(i)}
               disabled={c.revealed || round !== "play"}
-              className={`aspect-square rounded-lg border text-2xl font-bold flex items-center justify-center transition ${
+              className={`aspect-square rounded-md border font-bold flex items-center justify-center transition ${size <= 5 ? "text-2xl" : size <= 7 ? "text-base" : "text-xs"} ${
                 c.revealed
                   ? c.mine ? "bg-destructive/30 border-destructive" : "bg-emerald-500/20 border-emerald-500"
                   : "bg-muted hover:bg-muted/70 border-border"
