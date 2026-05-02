@@ -39,60 +39,86 @@ export function Dino() {
   const [best, setBest] = useState(() => Number(localStorage.getItem("dino_best") || 0));
   const [over, setOver] = useState(false);
 
-  const W = 600, H = 180;
+  const W = 700, H = 200;
   const stateRef = useRef({
-    y: 130, vy: 0, jumping: false,
-    obstacles: [] as Array<{ x: number; w: number; h: number }>,
+    y: 150, vy: 0, jumping: false, ducking: false,
+    obstacles: [] as Array<{ x: number; w: number; h: number; flying: boolean }>,
+    clouds: [] as Array<{ x: number; y: number }>,
     speed: 6, frame: 0, last: 0, score: 0, dead: false,
+    groundOffset: 0,
   });
+  const GROUND_Y = 170;
 
   const jump = useCallback(() => {
     const s = stateRef.current;
     if (s.dead) {
-      // restart
-      s.y = 130; s.vy = 0; s.jumping = false; s.obstacles = []; s.speed = 6;
+      s.y = 150; s.vy = 0; s.jumping = false; s.obstacles = []; s.speed = 6;
       s.frame = 0; s.score = 0; s.dead = false; s.last = 0;
       setOver(false); setScore(0); return;
     }
-    if (!s.jumping) { s.vy = -10; s.jumping = true; }
+    if (!s.jumping) { s.vy = -12; s.jumping = true; }
   }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code === "Space" || e.code === "ArrowUp") { e.preventDefault(); jump(); }
+      if (e.code === "ArrowDown") { stateRef.current.ducking = true; }
+    };
+    const onUp = (e: KeyboardEvent) => {
+      if (e.code === "ArrowDown") stateRef.current.ducking = false;
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keyup", onUp);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onUp);
+    };
   }, [jump]);
 
   useEffect(() => {
     const c = canvasRef.current!; const ctx = c.getContext("2d")!;
     let raf = 0;
+    // seed clouds
+    for (let i = 0; i < 4; i++) stateRef.current.clouds.push({ x: Math.random()*W, y: 30 + Math.random()*60 });
     const tick = (ts: number) => {
       const s = stateRef.current;
       const dt = s.last ? Math.min(0.04, (ts - s.last) / 1000) : 1/60;
       s.last = ts;
+      // sky
       ctx.fillStyle = "#f7f7f7"; ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = "#535353"; ctx.fillRect(0, 150, W, 2);
 
       if (!s.dead) {
         s.frame += dt * 60;
-        s.vy += 0.55;
+        s.vy += 0.7;
         s.y += s.vy;
-        if (s.y >= 130) { s.y = 130; s.vy = 0; s.jumping = false; }
-        s.speed += dt * 0.15;
+        if (s.y >= 150) { s.y = 150; s.vy = 0; s.jumping = false; }
+        s.speed += dt * 0.25;
         s.score += dt * 10;
         if (Math.floor(s.score) !== score) setScore(Math.floor(s.score));
+        s.groundOffset = (s.groundOffset + s.speed) % 24;
+        // clouds
+        s.clouds.forEach(cl => {
+          cl.x -= s.speed * 0.2;
+          if (cl.x < -50) { cl.x = W + 20; cl.y = 30 + Math.random()*60; }
+        });
 
-        if (s.obstacles.length === 0 || s.obstacles[s.obstacles.length-1].x < W - 200 - Math.random()*200) {
-          const h = 20 + Math.random() * 30;
-          s.obstacles.push({ x: W, w: 14 + Math.random() * 14, h });
+        if (s.obstacles.length === 0 || s.obstacles[s.obstacles.length-1].x < W - 250 - Math.random()*200) {
+          const flying = s.score > 200 && Math.random() < 0.25;
+          const h = flying ? 16 : 20 + Math.random() * 30;
+          s.obstacles.push({ x: W, w: flying ? 24 : 14 + Math.random() * 14, h, flying });
         }
         s.obstacles.forEach(o => o.x -= s.speed);
         s.obstacles = s.obstacles.filter(o => o.x + o.w > 0);
 
+        const playerH = s.ducking && !s.jumping ? 20 : 40;
+        const playerW = s.ducking && !s.jumping ? 44 : 30;
+        const playerY = s.ducking && !s.jumping ? s.y + 20 : s.y - 30;
         for (const o of s.obstacles) {
-          if (40 + 30 > o.x && 40 < o.x + o.w && s.y + 20 > 150 - o.h) {
+          const oy = o.flying ? GROUND_Y - 60 - o.h : GROUND_Y - o.h;
+          if (
+            40 + playerW > o.x && 40 < o.x + o.w &&
+            playerY + playerH > oy && playerY < oy + o.h
+          ) {
             s.dead = true;
             setOver(true);
             const b = Math.max(best, Math.floor(s.score));
@@ -102,22 +128,72 @@ export function Dino() {
         }
       }
 
-      // dino
-      ctx.fillStyle = "#535353";
-      ctx.fillRect(40, s.y - 30, 30, 30);
-      ctx.fillRect(60, s.y - 40, 14, 14);
-      ctx.fillStyle = "white";
-      ctx.fillRect(68, s.y - 36, 3, 3);
-      // legs animate
-      const legSwap = Math.floor(s.frame / 6) % 2 === 0 && !s.jumping;
-      ctx.fillStyle = "#535353";
-      if (legSwap) { ctx.fillRect(42, s.y, 6, 10); ctx.fillRect(58, s.y, 6, 4); }
-      else { ctx.fillRect(42, s.y, 6, 4); ctx.fillRect(58, s.y, 6, 10); }
+      // clouds
+      ctx.fillStyle = "#cfd8dc";
+      for (const cl of s.clouds) {
+        ctx.beginPath();
+        ctx.arc(cl.x, cl.y, 8, 0, Math.PI*2);
+        ctx.arc(cl.x + 8, cl.y + 2, 10, 0, Math.PI*2);
+        ctx.arc(cl.x + 18, cl.y, 7, 0, Math.PI*2);
+        ctx.fill();
+      }
+      // ground line + dashes
+      ctx.fillStyle = "#535353"; ctx.fillRect(0, GROUND_Y, W, 2);
+      ctx.fillStyle = "#888";
+      for (let i = -1; i < W / 24 + 2; i++) {
+        ctx.fillRect(i * 24 - s.groundOffset, GROUND_Y + 4, 12, 2);
+      }
 
-      // obstacles (cacti)
-      ctx.fillStyle = "#3a8a3a";
+      // dino — improved sprite
+      ctx.fillStyle = "#535353";
+      if (s.ducking && !s.jumping) {
+        // ducking long shape
+        ctx.fillRect(40, s.y + 20, 44, 20);
+        ctx.fillRect(72, s.y + 14, 14, 12);
+        ctx.fillStyle = "white"; ctx.fillRect(80, s.y + 18, 3, 3);
+      } else {
+        // body
+        ctx.fillRect(40, s.y - 30, 30, 30);
+        // head
+        ctx.fillRect(60, s.y - 42, 18, 16);
+        // eye
+        ctx.fillStyle = "white"; ctx.fillRect(70, s.y - 38, 4, 4);
+        ctx.fillStyle = "#535353";
+        // mouth
+        ctx.fillRect(72, s.y - 30, 6, 2);
+        // tail
+        ctx.fillRect(28, s.y - 20, 14, 8);
+        // arm
+        ctx.fillRect(56, s.y - 12, 6, 4);
+        // legs animate
+        const legSwap = Math.floor(s.frame / 4) % 2 === 0 && !s.jumping;
+        if (legSwap) { ctx.fillRect(42, s.y, 8, 12); ctx.fillRect(58, s.y, 8, 4); }
+        else { ctx.fillRect(42, s.y, 8, 4); ctx.fillRect(58, s.y, 8, 12); }
+      }
+
+      // obstacles (cacti + birds)
       for (const o of s.obstacles) {
-        ctx.fillRect(o.x, 150 - o.h, o.w, o.h);
+        if (o.flying) {
+          // bird
+          const flap = Math.floor(s.frame / 8) % 2;
+          const by = GROUND_Y - 60;
+          ctx.fillStyle = "#535353";
+          ctx.fillRect(o.x + 4, by + 4, 16, 6); // body
+          if (flap) {
+            ctx.fillRect(o.x, by - 2, 12, 4);
+            ctx.fillRect(o.x + 12, by - 2, 12, 4);
+          } else {
+            ctx.fillRect(o.x, by + 10, 12, 4);
+            ctx.fillRect(o.x + 12, by + 10, 12, 4);
+          }
+          ctx.fillRect(o.x + 18, by + 2, 6, 4); // beak
+        } else {
+          ctx.fillStyle = "#3a8a3a";
+          ctx.fillRect(o.x, GROUND_Y - o.h, o.w, o.h);
+          // cactus arms
+          ctx.fillRect(o.x - 4, GROUND_Y - o.h * 0.7, 4, o.h * 0.4);
+          ctx.fillRect(o.x + o.w, GROUND_Y - o.h * 0.5, 4, o.h * 0.3);
+        }
       }
 
       ctx.fillStyle = "#535353";
@@ -150,7 +226,7 @@ export function Dino() {
         className="rounded-xl border border-border touch-none cursor-pointer max-w-full"
         style={{ width: "100%", maxWidth: W, imageRendering: "pixelated" }}
       />
-      <p className="text-xs text-muted-foreground">Tap or SPACE to jump · Best {best}{over && " · Game over"}</p>
+      <p className="text-xs text-muted-foreground">SPACE/↑ jump · ↓ duck · Best {best}{over && " · Game over"}</p>
     </div>
   );
 }
