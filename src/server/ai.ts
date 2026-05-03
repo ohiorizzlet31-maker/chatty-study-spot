@@ -86,9 +86,19 @@ export const chatWithAI = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data }) => {
+    // The client may inject a synthetic { role: "user", content: "::MEMORY::\n..." } as
+    // the first message — extract it into the system prompt instead of leaving it visible.
+    let memory = "";
+    let msgs = data.messages;
+    if (msgs.length && msgs[0].role === "user" && msgs[0].content.startsWith("::MEMORY::")) {
+      memory = msgs[0].content.replace("::MEMORY::", "").trim();
+      msgs = msgs.slice(1);
+    }
+    const sys = "You are a friendly study buddy AI. Help with studying, focus tips, explaining concepts. Keep replies concise and warm." +
+      (memory ? `\n\nKnown facts about the user (use naturally if relevant, do not list them back):\n${memory}` : "");
     const reply = await callAI([
-      { role: "system", content: "You are a friendly study buddy AI. Help with studying, focus tips, explaining concepts. Keep replies concise and warm." },
-      ...data.messages,
+      { role: "system", content: sys },
+      ...msgs,
     ]);
     return { reply };
   });
