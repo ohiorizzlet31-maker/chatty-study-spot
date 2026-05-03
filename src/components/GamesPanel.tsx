@@ -13,11 +13,17 @@ import {
   WhackAMole,
   Asteroids,
   MiniMinecraft,
+  Hangman,
+  Crash,
+  Roulette,
+  Jackpot777,
 } from "@/components/MoreGames";
+import { Minecraft3D } from "@/components/Minecraft3D";
 
 type GameId =
   | "menu" | "ttt" | "flappy" | "g2048" | "tetris" | "snake" | "html" | "gnmath"
-  | "dino" | "msweeper" | "plinko" | "mines" | "pong" | "rps" | "whack" | "asteroids" | "mc";
+  | "dino" | "msweeper" | "plinko" | "mines" | "pong" | "rps" | "whack" | "asteroids" | "mc"
+  | "hangman" | "crash" | "roulette" | "jackpot" | "mc3d";
 
 export function GamesPanel({ onClose, name }: { onClose: () => void; name: string }) {
   const [game, setGame] = useState<GameId>("menu");
@@ -40,6 +46,11 @@ export function GamesPanel({ onClose, name }: { onClose: () => void; name: strin
     whack: "Whack-a-Mole",
     asteroids: "Asteroids",
     mc: "Mini Minecraft",
+    hangman: "Hangman",
+    crash: "Crash",
+    roulette: "Roulette",
+    jackpot: "Jackpot 777",
+    mc3d: "Minecraft 3D",
   };
 
   return (
@@ -76,6 +87,11 @@ export function GamesPanel({ onClose, name }: { onClose: () => void; name: strin
             <GameTile emoji="🐹" name="Whack-a-Mole" desc="30s scramble" onClick={() => setGame("whack")} />
             <GameTile emoji="🚀" name="Asteroids" desc="← → ↑ + Space" onClick={() => setGame("asteroids")} />
             <GameTile emoji="⛏️" name="Mini Minecraft" desc="2D survival" onClick={() => setGame("mc")} badge="NEW" />
+            <GameTile emoji="🧊" name="Minecraft 3D" desc="First-person voxel" onClick={() => setGame("mc3d")} badge="NEW" />
+            <GameTile emoji="🔤" name="Hangman" desc="Guess the word" onClick={() => setGame("hangman")} />
+            <GameTile emoji="📈" name="Crash" desc="Cash out before crash" onClick={() => setGame("crash")} badge="$" />
+            <GameTile emoji="🎡" name="Roulette" desc="Place your bets" onClick={() => setGame("roulette")} badge="$" />
+            <GameTile emoji="🎰" name="Jackpot 777" desc="Slots — 50x jackpot" onClick={() => setGame("jackpot")} badge="$" />
           </div>
         )}
 
@@ -95,6 +111,11 @@ export function GamesPanel({ onClose, name }: { onClose: () => void; name: strin
         {game === "whack" && <WhackAMole />}
         {game === "asteroids" && <Asteroids />}
         {game === "mc" && <MiniMinecraft />}
+        {game === "mc3d" && <Minecraft3D />}
+        {game === "hangman" && <Hangman />}
+        {game === "crash" && <Crash />}
+        {game === "roulette" && <Roulette />}
+        {game === "jackpot" && <Jackpot777 />}
       </div>
     </div>
   );

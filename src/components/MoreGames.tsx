@@ -1760,3 +1760,96 @@ export function MiniMinecraft() {
     </div>
   );
 }
+/* =================================================================== */
+/* JACKPOT 777 — slot machine                                         */
+/* =================================================================== */
+export function Jackpot777() {
+  const [balance, setBalance, resetBalance] = useGBalance();
+  const [bet, setBet] = useState(5);
+  const [reels, setReels] = useState<string[]>(["7","7","7"]);
+  const [spinning, setSpinning] = useState(false);
+  const [msg, setMsg] = useState("");
+  const SYMBOLS = ["🍒","🍋","🍊","🔔","⭐","💎","7️⃣"];
+
+  function spin() {
+    if (spinning || balance < bet || bet <= 0) return;
+    setSpinning(true);
+    setMsg("");
+    setBalance(balance - bet);
+    let ticks = 0;
+    const iv = setInterval(() => {
+      setReels([
+        SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)],
+        SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)],
+        SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)],
+      ]);
+      ticks++;
+      if (ticks > 18) {
+        clearInterval(iv);
+        // final result with slight house edge
+        const r = Math.random();
+        let final: string[];
+        let mult = 0;
+        if (r < 0.005) { final = ["7️⃣","7️⃣","7️⃣"]; mult = 50; }       // jackpot
+        else if (r < 0.02) { final = ["💎","💎","💎"]; mult = 20; }
+        else if (r < 0.05) { final = ["⭐","⭐","⭐"]; mult = 10; }
+        else if (r < 0.10) { final = ["🔔","🔔","🔔"]; mult = 5; }
+        else if (r < 0.20) {
+          const s = SYMBOLS[Math.floor(Math.random()*4)];
+          final = [s,s,s]; mult = 3;
+        } else if (r < 0.40) {
+          const s = SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)];
+          const o = SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)];
+          final = [s,s,o]; mult = 1.5;
+        } else {
+          final = [
+            SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)],
+            SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)],
+            SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)],
+          ];
+          // ensure not all same accidentally
+          if (final[0]===final[1] && final[1]===final[2]) final[2] = SYMBOLS[(SYMBOLS.indexOf(final[2])+1)%SYMBOLS.length];
+          mult = 0;
+        }
+        setReels(final);
+        if (mult > 0) {
+          const win = Math.round(bet * mult * 100) / 100;
+          setBalance(loadGBalance() + win);
+          setMsg(mult === 50 ? `🎉 JACKPOT! ${mult}x · +$${win.toFixed(2)}` : `${mult}x · +$${win.toFixed(2)}`);
+        } else {
+          setMsg("No win.");
+        }
+        setSpinning(false);
+      }
+    }, 70);
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-2xl font-bold">${balance.toFixed(2)} <span className="text-xs text-muted-foreground">(fake)</span></p>
+          {msg && <p className="text-sm">{msg}</p>}
+        </div>
+        <Button size="sm" variant="outline" onClick={resetBalance}>Reset $50</Button>
+      </div>
+      <div className="bg-gradient-to-br from-amber-500 to-red-600 rounded-2xl p-6 text-center">
+        <div className="bg-black/40 rounded-xl p-4 inline-flex gap-3">
+          {reels.map((s, i) => (
+            <div key={i} className="w-20 h-20 bg-white rounded-lg flex items-center justify-center text-5xl shadow-inner">
+              {s}
+            </div>
+          ))}
+        </div>
+        <p className="text-white/90 text-xs mt-2 font-mono">7️⃣7️⃣7️⃣ = 50x · 💎=20x · ⭐=10x · 🔔=5x</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <label className="text-sm">Bet $</label>
+        <input type="number" min={1} max={Math.max(1, Math.floor(balance))} value={bet} onChange={(e) => setBet(Math.max(1, Number(e.target.value)||1))} className="w-20 h-8 px-2 rounded-md border border-border bg-background text-sm" />
+        <Button onClick={spin} disabled={spinning || balance < bet || bet <= 0} className="ml-auto">
+          {spinning ? "Spinning…" : "🎰 SPIN"}
+        </Button>
+      </div>
+    </div>
+  );
+}
