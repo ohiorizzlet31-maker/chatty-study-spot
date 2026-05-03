@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Lock, Megaphone, Zap, FileText, Trophy } from "lucide-react";
+import { X, Lock, Megaphone, Zap, FileText, Trophy, Ban, BadgeCheck, Server as ServerIcon } from "lucide-react";
 import { checkVerifiedPassword } from "@/lib/verified";
 import { getSettings, saveSettings } from "@/lib/settings";
 
@@ -21,8 +21,12 @@ export function LogsPanel({ name, onClose }: { name: string; onClose: () => void
   const [pw, setPw] = useState("");
   const [pwErr, setPwErr] = useState("");
   const [checking, setChecking] = useState(false);
-  const [tab, setTab] = useState<"events" | "prank">("events");
+  const [tab, setTab] = useState<"events" | "prank" | "bans" | "servers">("events");
   const [events, setEvents] = useState<PrankRow[]>([]);
+  const [bans, setBans] = useState<Array<{ id: string; banned_name: string; banned_by: string; reason: string | null; created_at: string }>>([]);
+  const [serverList, setServerList] = useState<Array<{ id: string; name: string; owner_name: string; verified: boolean }>>([]);
+  const [banName, setBanName] = useState("");
+  const [banReason, setBanReason] = useState("");
   const [target, setTarget] = useState("");
   const [songQuery, setSongQuery] = useState("Mario Tomato Crazy Funny Songs");
   const [duration, setDuration] = useState(60);
@@ -45,6 +49,16 @@ export function LogsPanel({ name, onClose }: { name: string; onClose: () => void
       .then(({ data }: { data: PrankRow[] | null }) => {
         if (active && data) setEvents(data);
       });
+    (supabase as any)
+      .from("hwid_bans")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .then(({ data }: { data: any }) => { if (active && data) setBans(data); });
+    (supabase as any)
+      .from("servers")
+      .select("id,name,owner_name,verified")
+      .order("created_at", { ascending: false })
+      .then(({ data }: { data: any }) => { if (active && data) setServerList(data); });
     const channel = supabase
       .channel("logs:prank_events")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "prank_events" }, (payload) => {
@@ -56,6 +70,32 @@ export function LogsPanel({ name, onClose }: { name: string; onClose: () => void
       supabase.removeChannel(channel);
     };
   }, [unlocked]);
+
+  async function fireBan(e: React.FormEvent) {
+    e.preventDefault();
+    if (!banName.trim()) return;
+    const { data, error } = await (supabase as any).from("hwid_bans").insert({
+      banned_name: banName.trim(),
+      banned_by: name,
+      reason: banReason.trim() || null,
+    }).select().single();
+    if (error) { alert(error.message); return; }
+    setBans((p) => [data, ...p]);
+    setBanName(""); setBanReason("");
+  }
+
+  async function unban(id: string) {
+    if (!confirm("Unban this user?")) return;
+    const { error } = await (supabase as any).from("hwid_bans").delete().eq("id", id);
+    if (error) { alert(error.message); return; }
+    setBans((p) => p.filter((b) => b.id !== id));
+  }
+
+  async function toggleVerified(s: { id: string; verified: boolean }) {
+    const { error } = await (supabase as any).from("servers").update({ verified: !s.verified }).eq("id", s.id);
+    if (error) { alert(error.message); return; }
+    setServerList((p) => p.map((x) => x.id === s.id ? { ...x, verified: !s.verified } : x));
+  }
 
   async function unlock(e: React.FormEvent) {
     e.preventDefault();
@@ -150,6 +190,18 @@ export function LogsPanel({ name, onClose }: { name: string; onClose: () => void
               >
                 <Zap className="w-4 h-4 inline mr-1" /> Prank
               </button>
+              <button
+                onClick={() => setTab("bans")}
+                className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px ${tab === "bans" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
+              >
+                <Ban className="w-4 h-4 inline mr-1" /> Bans
+              </button>
+              <button
+                onClick={() => setTab("servers")}
+                className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px ${tab === "servers" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
+              >
+                <ServerIcon className="w-4 h-4 inline mr-1" /> Servers
+              </button>
             </div>
 
             {tab === "events" && (
@@ -227,6 +279,49 @@ export function LogsPanel({ name, onClose }: { name: string; onClose: () => void
                   {posting ? "Firing…" : "🚨 Fire prank"}
                 </Button>
               </form>
+            )}
+
+            {tab === "bans" && (
+              <div className="space-y-3">
+                <form onSubmit={fireBan} className="p-3 rounded-xl border border-destructive/30 bg-destructive/5 space-y-2">
+                  <p className="text-sm font-semibold flex items-center gap-1"><Ban className="w-4 h-4" /> Ban a user</p>
+                  <Input value={banName} onChange={(e) => setBanName(e.target.value)} placeholder="exact username to ban" />
+                  <Input value={banReason} onChange={(e) => setBanReason(e.target.value)} placeholder="reason (optional)" />
+                  <Button type="submit" variant="destructive" size="sm" disabled={!banName.trim()}>Ban</Button>
+                </form>
+                {bans.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No bans.</p>}
+                {bans.map((b) => (
+                  <div key={b.id} className="p-3 rounded-xl border border-border bg-muted/20 text-sm flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p><span className="font-semibold text-destructive">{b.banned_name}</span> banned by <span className="font-semibold">{b.banned_by}</span></p>
+                      {b.reason && <p className="text-xs text-muted-foreground">"{b.reason}"</p>}
+                      <p className="text-[10px] text-muted-foreground">{new Date(b.created_at).toLocaleString()}</p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => unban(b.id)}>Unban</Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {tab === "servers" && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Toggle the verified ✓ badge on community servers.</p>
+                {serverList.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No servers yet.</p>}
+                {serverList.map((s) => (
+                  <div key={s.id} className="p-3 rounded-xl border border-border bg-muted/20 text-sm flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold truncate flex items-center gap-1">
+                        {s.name}
+                        {s.verified && <BadgeCheck className="w-4 h-4 text-primary" />}
+                      </p>
+                      <p className="text-xs text-muted-foreground">owner {s.owner_name}</p>
+                    </div>
+                    <Button size="sm" variant={s.verified ? "outline" : "default"} onClick={() => toggleVerified(s)}>
+                      {s.verified ? "Unverify" : "Verify"}
+                    </Button>
+                  </div>
+                ))}
+              </div>
             )}
           </>
         )}
