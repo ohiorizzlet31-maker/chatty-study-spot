@@ -14,6 +14,7 @@ type Server = {
   owner_name: string;
   visibility: "public" | "unlisted" | "private";
   invite_code: string;
+  verified?: boolean;
 };
 type Member = { id: string; server_id: string; member_name: string; role: "owner" | "admin" | "member" };
 type Channel = {
@@ -337,7 +338,10 @@ export function ServersPanel({
                       {s.name.slice(0, 1).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold truncate">{s.name}</p>
+                      <p className="font-semibold truncate flex items-center gap-1">
+                        {s.name}
+                        {s.verified && <BadgeCheck className="w-3.5 h-3.5 text-primary" />}
+                      </p>
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
                         <VisIcon v={s.visibility} /> {s.visibility} · owner <NameTag n={s.owner_name} />
                       </p>
@@ -358,7 +362,10 @@ export function ServersPanel({
                     {s.name.slice(0, 1).toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold truncate">{s.name}</p>
+                    <p className="font-semibold truncate flex items-center gap-1">
+                      {s.name}
+                      {s.verified && <BadgeCheck className="w-3.5 h-3.5 text-primary" />}
+                    </p>
                     <p className="text-xs text-muted-foreground">owner <NameTag n={s.owner_name} /></p>
                   </div>
                   <Button size="sm" onClick={() => joinPublic(s)}>Join</Button>
