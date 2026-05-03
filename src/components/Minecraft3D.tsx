@@ -60,7 +60,7 @@ export function Minecraft3D() {
   const [selected, setSelected] = useState<BlockType>("grass");
   const [locked, setLocked] = useState(false);
   const [inv, setInv] = useState<Record<BlockType, number>>({
-    grass: 99, dirt: 99, stone: 99, wood: 50, leaves: 30, sand: 20, plank: 0,
+    grass: 99, dirt: 99, stone: 99, wood: 50, leaves: 30, sand: 20, plank: 0, glass: 10, cobble: 20,
   });
   const selectedRef = useRef(selected); selectedRef.current = selected;
   const invRef = useRef(inv); invRef.current = inv;
