@@ -1853,3 +1853,161 @@ export function Jackpot777() {
     </div>
   );
 }
+
+/* =================================================================== */
+/* PING PONG — perspective table tennis vs AI                          */
+/* =================================================================== */
+export function PingPong() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [score, setScore] = useState({ p: 0, ai: 0 });
+  const W = 520, H = 360;
+  const stateRef = useRef({
+    // ball in 3D-ish coords: x (-1..1 across table), z (0..1 from AI to player), y height
+    bx: 0, bz: 0.5, by: 0.4,
+    vx: 0.012, vz: 0.022, vy: 0,
+    px: 0, ax: 0, // paddle x positions
+    targetX: 0,
+    serving: true, serveTimer: 60,
+  });
+
+  useEffect(() => {
+    const c = canvasRef.current!; const ctx = c.getContext("2d")!;
+    let raf = 0;
+    const onMove = (e: MouseEvent | TouchEvent) => {
+      const rect = c.getBoundingClientRect();
+      const cx = ("touches" in e ? e.touches[0].clientX : e.clientX) - rect.left;
+      stateRef.current.targetX = (cx / rect.width) * 2 - 1;
+    };
+    c.addEventListener("mousemove", onMove);
+    c.addEventListener("touchmove", onMove, { passive: true });
+
+    function reset(toPlayer: boolean) {
+      const s = stateRef.current;
+      s.bx = 0; s.bz = toPlayer ? 0.5 : 0.5; s.by = 0.4;
+      s.vx = (Math.random() - 0.5) * 0.01;
+      s.vz = toPlayer ? 0.022 : -0.022;
+      s.vy = 0.02;
+      s.serving = true; s.serveTimer = 50;
+    }
+
+    // project (x in [-1,1], z in [0,1], y height) -> screen
+    function project(x: number, z: number, y: number) {
+      // perspective: near (z=1) wider, far (z=0) narrower
+      const persp = 0.35 + z * 0.65;
+      const sx = W/2 + x * (W * 0.42) * persp;
+      const sy = H * 0.85 - z * (H * 0.65) - y * 80 * persp;
+      return { sx, sy, persp };
+    }
+
+    const tick = () => {
+      const s = stateRef.current;
+      // paddle smoothing
+      s.px += (s.targetX - s.px) * 0.25;
+      // AI follows ball with limit
+      const aiTarget = Math.max(-0.9, Math.min(0.9, s.bx + (Math.random()-0.5)*0.1));
+      s.ax += Math.max(-0.025, Math.min(0.025, aiTarget - s.ax));
+
+      if (s.serving) {
+        s.serveTimer--;
+        if (s.serveTimer <= 0) s.serving = false;
+      } else {
+        s.bx += s.vx; s.bz += s.vz; s.by += s.vy;
+        s.vy -= 0.0018; // gravity
+        // bounce off table
+        if (s.by < 0 && s.bz > 0.02 && s.bz < 0.98) { s.by = 0; s.vy = Math.abs(s.vy) * 0.85; }
+        // walls
+        if (s.bx < -1) { s.bx = -1; s.vx = Math.abs(s.vx); }
+        if (s.bx > 1) { s.bx = 1; s.vx = -Math.abs(s.vx); }
+
+        // player paddle hit (z near 1)
+        if (s.bz >= 0.95 && s.vz > 0) {
+          if (Math.abs(s.bx - s.px) < 0.25 && s.by < 0.5) {
+            s.vz = -Math.abs(s.vz) * 1.05;
+            s.vx += (s.bx - s.px) * 0.04;
+            s.vy = 0.025;
+          } else if (s.bz > 1.05) {
+            setScore(sc => ({ ...sc, ai: sc.ai + 1 }));
+            reset(false);
+          }
+        }
+        // AI paddle hit (z near 0)
+        if (s.bz <= 0.05 && s.vz < 0) {
+          if (Math.abs(s.bx - s.ax) < 0.25 && s.by < 0.5) {
+            s.vz = Math.abs(s.vz) * 1.05;
+            s.vx += (s.bx - s.ax) * 0.04;
+            s.vy = 0.025;
+          } else if (s.bz < -0.05) {
+            setScore(sc => ({ ...sc, p: sc.p + 1 }));
+            reset(true);
+          }
+        }
+        // ball off table sideways or far
+        if (s.by < -0.2) { setScore(sc => s.vz > 0 ? { ...sc, ai: sc.ai + 1 } : { ...sc, p: sc.p + 1 }); reset(s.vz < 0); }
+      }
+
+      // draw
+      // sky/wall gradient
+      const grd = ctx.createLinearGradient(0, 0, 0, H);
+      grd.addColorStop(0, "#1a3a5a"); grd.addColorStop(1, "#0a1a2a");
+      ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
+
+      // table (trapezoid)
+      const tl = project(-1, 0, 0), tr = project(1, 0, 0);
+      const bl = project(-1, 1, 0), br = project(1, 1, 0);
+      ctx.fillStyle = "#1f6f3a";
+      ctx.beginPath(); ctx.moveTo(tl.sx, tl.sy); ctx.lineTo(tr.sx, tr.sy); ctx.lineTo(br.sx, br.sy); ctx.lineTo(bl.sx, bl.sy); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "white"; ctx.lineWidth = 2;
+      ctx.stroke();
+      // center net
+      const nl = project(-1, 0.5, 0), nr = project(1, 0.5, 0);
+      const nlt = project(-1, 0.5, 0.15), nrt = project(1, 0.5, 0.15);
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.beginPath(); ctx.moveTo(nl.sx, nl.sy); ctx.lineTo(nr.sx, nr.sy); ctx.lineTo(nrt.sx, nrt.sy); ctx.lineTo(nlt.sx, nlt.sy); ctx.closePath(); ctx.fill();
+      // center line
+      ctx.strokeStyle = "white"; ctx.lineWidth = 1;
+      ctx.beginPath();
+      const cf = project(0, 0, 0), cn = project(0, 1, 0);
+      ctx.moveTo(cf.sx, cf.sy); ctx.lineTo(cn.sx, cn.sy); ctx.stroke();
+
+      // ball shadow
+      const sh = project(s.bx, s.bz, 0);
+      ctx.fillStyle = "rgba(0,0,0,0.4)";
+      ctx.beginPath(); ctx.ellipse(sh.sx, sh.sy, 8 * sh.persp, 3 * sh.persp, 0, 0, Math.PI*2); ctx.fill();
+
+      // ball
+      const b = project(s.bx, s.bz, s.by);
+      ctx.fillStyle = "#fff";
+      ctx.beginPath(); ctx.arc(b.sx, b.sy, 8 * b.persp, 0, Math.PI*2); ctx.fill();
+
+      // AI paddle (far)
+      const ap = project(s.ax, 0, 0.1);
+      ctx.fillStyle = "#c0392b";
+      ctx.fillRect(ap.sx - 22 * ap.persp, ap.sy - 30 * ap.persp, 44 * ap.persp, 8 * ap.persp);
+      ctx.fillStyle = "#7f1d0a";
+      ctx.fillRect(ap.sx - 3 * ap.persp, ap.sy - 22 * ap.persp, 6 * ap.persp, 18 * ap.persp);
+
+      // player paddle (near)
+      const pp = project(s.px, 1, 0.1);
+      ctx.fillStyle = "#1e88e5";
+      ctx.fillRect(pp.sx - 30 * pp.persp, pp.sy - 40 * pp.persp, 60 * pp.persp, 12 * pp.persp);
+      ctx.fillStyle = "#0d3a66";
+      ctx.fillRect(pp.sx - 4 * pp.persp, pp.sy - 30 * pp.persp, 8 * pp.persp, 24 * pp.persp);
+
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      c.removeEventListener("mousemove", onMove);
+      c.removeEventListener("touchmove", onMove);
+    };
+  }, []);
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <p className="font-mono text-2xl">You {score.p} : {score.ai} AI</p>
+      <canvas ref={canvasRef} width={W} height={H} className="rounded-xl border border-border max-w-full touch-none" style={{ width: "100%", maxWidth: W }} />
+      <p className="text-xs text-muted-foreground">Move mouse left/right to swing your paddle. 3D table tennis vs AI.</p>
+    </div>
+  );
+}
