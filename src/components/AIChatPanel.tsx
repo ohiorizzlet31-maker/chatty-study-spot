@@ -2,11 +2,12 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { chatWithAI } from "@/server/ai";
-import { Send, X, Sparkles, Trash2 } from "lucide-react";
+import { Send, X, Sparkles, Trash2, Brain } from "lucide-react";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
 const STORAGE = "studyroom_ai_history";
+const MEM_KEY = "studyroom_ai_memory";
 const INITIAL: Msg[] = [
   { role: "assistant", content: "Hi! I'm your AI study buddy. Ask me anything — concepts, focus tips, study plans." },
 ];
@@ -20,11 +21,25 @@ function loadHistory(): Msg[] {
   } catch {}
   return INITIAL;
 }
+function loadMemory(): string[] {
+  try {
+    const raw = localStorage.getItem(MEM_KEY);
+    if (!raw) return [];
+    const p = JSON.parse(raw);
+    return Array.isArray(p) ? p.slice(-30) : [];
+  } catch { return []; }
+}
+function saveMemory(facts: string[]) {
+  try { localStorage.setItem(MEM_KEY, JSON.stringify(facts.slice(-30))); } catch {}
+}
 
 export function AIChatPanel({ onClose }: { onClose: () => void }) {
   const [messages, setMessages] = useState<Msg[]>(loadHistory);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showMem, setShowMem] = useState(false);
+  const [memory, setMemory] = useState<string[]>(loadMemory);
+  const [newFact, setNewFact] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -42,6 +57,18 @@ export function AIChatPanel({ onClose }: { onClose: () => void }) {
     try { localStorage.removeItem(STORAGE); } catch {}
   }
 
+  function addFact(e: React.FormEvent) {
+    e.preventDefault();
+    const f = newFact.trim();
+    if (!f) return;
+    const next = [...memory, f].slice(-30);
+    setMemory(next); saveMemory(next); setNewFact("");
+  }
+  function removeFact(i: number) {
+    const next = memory.filter((_, idx) => idx !== i);
+    setMemory(next); saveMemory(next);
+  }
+
   async function send(e: React.FormEvent) {
     e.preventDefault();
     const content = input.trim();
@@ -50,8 +77,22 @@ export function AIChatPanel({ onClose }: { onClose: () => void }) {
     setMessages(next);
     setInput("");
     setLoading(true);
+    // Auto-capture simple "remember that X" / "my X is Y" facts
+    const lower = content.toLowerCase();
+    const remMatch = content.match(/^remember(?: that)?[:\s]+(.+)/i);
+    if (remMatch) {
+      const fact = remMatch[1].trim();
+      const upd = [...memory, fact].slice(-30);
+      setMemory(upd); saveMemory(upd);
+    } else if (/(my name is|i am|i'm|i like|i love|i hate|my favorite)/i.test(lower) && content.length < 200) {
+      const upd = [...memory, content].slice(-30);
+      setMemory(upd); saveMemory(upd);
+    }
     try {
-      const { reply } = await chatWithAI({ data: { messages: next } });
+      const memMsgs: Msg[] = memory.length
+        ? [{ role: "user", content: "::MEMORY::\n" + memory.map((f) => `- ${f}`).join("\n") }, ...next]
+        : next;
+      const { reply } = await chatWithAI({ data: { messages: memMsgs } });
       setMessages((m) => [...m, { role: "assistant", content: reply }]);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "AI failed.";
@@ -68,12 +109,34 @@ export function AIChatPanel({ onClose }: { onClose: () => void }) {
           <Sparkles className="w-4 h-4" style={{ color: "var(--accent)" }} /> AI Buddy
         </h2>
         <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" onClick={() => setShowMem((s) => !s)} title="Memory">
+            <Brain className="w-4 h-4" />
+          </Button>
           <Button variant="ghost" size="icon" onClick={clearHistory} title="Clear history">
             <Trash2 className="w-4 h-4" />
           </Button>
           <Button variant="ghost" size="icon" onClick={onClose}><X className="w-4 h-4" /></Button>
         </div>
       </div>
+      {showMem && (
+        <div className="border-b border-border bg-muted/20 p-3 max-h-60 overflow-y-auto">
+          <p className="text-xs font-semibold mb-2 flex items-center gap-1"><Brain className="w-3 h-3" /> AI Memory ({memory.length}/30)</p>
+          <p className="text-[10px] text-muted-foreground mb-2">Stored on this device only. Say "remember that ..." in chat to auto-add.</p>
+          <form onSubmit={addFact} className="flex gap-1 mb-2">
+            <Input value={newFact} onChange={(e) => setNewFact(e.target.value)} placeholder="Add a fact about you" className="h-8 text-xs" />
+            <Button type="submit" size="sm" disabled={!newFact.trim()}>Add</Button>
+          </form>
+          <ul className="space-y-1">
+            {memory.length === 0 && <li className="text-xs text-muted-foreground italic">No memories yet.</li>}
+            {memory.map((f, i) => (
+              <li key={i} className="flex items-start gap-1 text-xs bg-background rounded px-2 py-1">
+                <span className="flex-1">{f}</span>
+                <button onClick={() => removeFact(i)} className="text-muted-foreground hover:text-destructive shrink-0"><X className="w-3 h-3" /></button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
