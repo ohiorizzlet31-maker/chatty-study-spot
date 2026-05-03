@@ -150,20 +150,14 @@ function Index() {
       {banned && (
         <div style={{
           position: "fixed", inset: 0, zIndex: 99999,
-          background: "rgba(0,0,0,0.85)", color: "#fff",
+          background: "#b00000", color: "#fff",
           display: "flex", alignItems: "center", justifyContent: "center",
           padding: 24, fontFamily: "system-ui",
+          textAlign: "center",
         }}>
-          <div style={{ maxWidth: 460, textAlign: "center" }}>
-            <p style={{ fontSize: 48, marginBottom: 12 }}>🚫</p>
-            <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>You're banned</h2>
-            <p style={{ opacity: 0.8, marginBottom: 16 }}>{banned}</p>
-            <button
-              onClick={() => setBanned(null)}
-              style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #555", background: "transparent", color: "#fff", cursor: "pointer" }}
-            >
-              Dismiss
-            </button>
+          <div>
+            <h1 style={{ fontSize: 72, fontWeight: 900, marginBottom: 16, letterSpacing: 2 }}>YOU ARE BANNED</h1>
+            <p style={{ fontSize: 28, fontWeight: 600 }}>Reason: {banned}</p>
           </div>
         </div>
       )}
