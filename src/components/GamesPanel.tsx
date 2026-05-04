@@ -18,13 +18,14 @@ import {
   Roulette,
   Jackpot777,
   PingPong,
+  BasketRandom,
 } from "@/components/MoreGames";
 import { Minecraft3D } from "@/components/Minecraft3D";
 
 type GameId =
   | "menu" | "ttt" | "flappy" | "g2048" | "tetris" | "snake" | "html" | "gnmath"
   | "dino" | "msweeper" | "plinko" | "mines" | "pong" | "rps" | "whack" | "asteroids" | "mc"
-  | "hangman" | "crash" | "roulette" | "jackpot" | "mc3d" | "pingpong";
+  | "hangman" | "crash" | "roulette" | "jackpot" | "mc3d" | "pingpong" | "basket";
 
 export function GamesPanel({ onClose, name }: { onClose: () => void; name: string }) {
   const [game, setGame] = useState<GameId>("menu");
@@ -53,6 +54,7 @@ export function GamesPanel({ onClose, name }: { onClose: () => void; name: strin
     jackpot: "Jackpot 777",
     mc3d: "Minecraft 3D",
     pingpong: "Ping Pong",
+    basket: "Basket Random",
   };
 
   return (
@@ -86,6 +88,7 @@ export function GamesPanel({ onClose, name }: { onClose: () => void; name: strin
             <GameTile emoji="💎" name="Mines" desc="Crypto-style mines" onClick={() => setGame("mines")} />
             <GameTile emoji="🏓" name="Pong" desc="vs AI" onClick={() => setGame("pong")} />
             <GameTile emoji="🏓" name="Ping Pong" desc="3D table tennis" onClick={() => setGame("pingpong")} badge="NEW" />
+            <GameTile emoji="🏀" name="Basket Random" desc="2P or vs AI · 1 key chaos" onClick={() => setGame("basket")} badge="NEW" />
             <GameTile emoji="✊" name="Rock Paper Scissors" desc="Best of forever" onClick={() => setGame("rps")} />
             <GameTile emoji="🐹" name="Whack-a-Mole" desc="30s scramble" onClick={() => setGame("whack")} />
             <GameTile emoji="🚀" name="Asteroids" desc="← → ↑ + Space" onClick={() => setGame("asteroids")} />
@@ -111,6 +114,7 @@ export function GamesPanel({ onClose, name }: { onClose: () => void; name: strin
         {game === "mines" && <MinesGame />}
         {game === "pong" && <Pong />}
         {game === "pingpong" && <PingPong />}
+        {game === "basket" && <BasketRandom />}
         {game === "rps" && <RPS />}
         {game === "whack" && <WhackAMole />}
         {game === "asteroids" && <Asteroids />}
