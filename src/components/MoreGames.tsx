@@ -2011,3 +2011,493 @@ export function PingPong() {
     </div>
   );
 }
+
+// ===== Basket Random =====
+// Two ragdoll-ish stick figures, one key each. Press jump to flail upward; gravity does the rest.
+// First to 5 wins. Mode: 2P (W vs ↑) or vs AI.
+type BRMode = "2p" | "ai";
+type BRPlayer = {
+  x: number; y: number;            // hip position
+  vx: number; vy: number;
+  onGround: boolean;
+  facing: 1 | -1;
+  // Limb angles (radians from hip-down)
+  legAngle: number;                // swings while in air
+  armAngle: number;
+  jumpCharge: number;              // increases while key held mid-air
+  color: string;
+  side: "L" | "R";
+};
+type BRBall = { x: number; y: number; vx: number; vy: number; r: number; spin: number };
+
+export function BasketRandom() {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [mode, setMode] = useState<BRMode | null>(null);
+  const [score, setScore] = useState({ l: 0, r: 0 });
+  const [winner, setWinner] = useState<string | null>(null);
+  const [aiDiff, setAiDiff] = useState<"easy" | "normal" | "hard">("normal");
+  const scoreRef = useRef(score);
+  scoreRef.current = score;
+
+  useEffect(() => {
+    if (!mode) return;
+    const cv = canvasRef.current!;
+    const ctx = cv.getContext("2d")!;
+    const W = cv.width, H = cv.height;
+    const GROUND = H - 40;
+    const GRAV = 0.55;
+
+    // Court constants
+    const HOOP_H = GROUND - 130;       // rim height
+    const RIM_X_L = 60;                // left rim x (inner edge)
+    const RIM_X_R = W - 60;            // right rim x (inner edge)
+    const RIM_W = 46;                  // rim diameter
+    const POST_X_L = 18;
+    const POST_X_R = W - 18;
+
+    function makePlayer(side: "L" | "R"): BRPlayer {
+      return {
+        x: side === "L" ? 200 : W - 200,
+        y: GROUND,
+        vx: 0, vy: 0, onGround: true,
+        facing: side === "L" ? 1 : -1,
+        legAngle: 0, armAngle: 0, jumpCharge: 0,
+        color: side === "L" ? "#e11d48" : "#2563eb",
+        side,
+      };
+    }
+    function makeBall(servingSide: "L" | "R"): BRBall {
+      return {
+        x: servingSide === "L" ? 220 : W - 220,
+        y: 100,
+        vx: 0, vy: 0, r: 16, spin: 0,
+      };
+    }
+
+    let pL = makePlayer("L");
+    let pR = makePlayer("R");
+    let ball = makeBall(Math.random() < 0.5 ? "L" : "R");
+    let lKey = false, rKey = false;
+    let lastScore = 0;
+    let resetCool = 0;
+
+    const onDown = (e: KeyboardEvent) => {
+      if (e.key === "w" || e.key === "W") lKey = true;
+      if (e.key === "ArrowUp" && mode === "2p") rKey = true;
+      if (e.key === " ") e.preventDefault();
+    };
+    const onUp = (e: KeyboardEvent) => {
+      if (e.key === "w" || e.key === "W") lKey = false;
+      if (e.key === "ArrowUp" && mode === "2p") rKey = false;
+    };
+    window.addEventListener("keydown", onDown);
+    window.addEventListener("keyup", onUp);
+
+    // Touch buttons
+    const touch = { l: false, r: false };
+    (window as any).__br_touch = touch;
+
+    function applyJumpKey(p: BRPlayer, pressed: boolean) {
+      // On ground: small forward hop + jump impulse, walks toward ball.
+      if (pressed && p.onGround) {
+        p.vy = -11;
+        // Walk toward ball
+        const dir = ball.x > p.x ? 1 : -1;
+        p.facing = dir as 1 | -1;
+        p.vx += dir * 3.2;
+        p.onGround = false;
+        p.jumpCharge = 0;
+      } else if (pressed && !p.onGround) {
+        // Mid-air flail: kick legs upward (toward ball) for big hit
+        p.jumpCharge = Math.min(1, p.jumpCharge + 0.06);
+        const dir = ball.x > p.x ? 1 : -1;
+        p.facing = dir as 1 | -1;
+        p.vx += dir * 0.25;
+        p.vy -= 0.18; // tiny lift while flailing
+      }
+      // Animate limbs
+      const target = pressed ? 1.6 : 0.0;
+      p.legAngle += (target * (p.facing) - p.legAngle) * 0.25;
+      p.armAngle += ((pressed ? -1.4 : 0) - p.armAngle) * 0.2;
+    }
+
+    function updatePlayer(p: BRPlayer) {
+      p.vy += GRAV;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vx *= 0.86;
+      // Bound to court
+      if (p.x < 40) { p.x = 40; p.vx = Math.abs(p.vx) * 0.4; }
+      if (p.x > W - 40) { p.x = W - 40; p.vx = -Math.abs(p.vx) * 0.4; }
+      if (p.y >= GROUND) {
+        p.y = GROUND; p.vy = 0; p.onGround = true; p.jumpCharge = 0;
+      }
+    }
+
+    // Returns which leg endpoint to use for ball collisions
+    function legEnd(p: BRPlayer): { x: number; y: number; vx: number; vy: number } {
+      const len = 46;
+      const ang = -Math.PI / 2 + p.legAngle * p.facing; // up-ish when flailing
+      const ex = p.x + Math.cos(ang) * len * (p.facing > 0 ? 1 : -1) * 0.6;
+      const ey = p.y - 30 + Math.sin(ang) * len;
+      // velocity contribution
+      return { x: ex, y: ey, vx: p.vx + p.facing * (p.jumpCharge * 6), vy: p.vy - p.jumpCharge * 6 };
+    }
+    function headPos(p: BRPlayer) {
+      return { x: p.x, y: p.y - 78, r: 14 };
+    }
+    function bodyPos(p: BRPlayer) {
+      return { x: p.x, y: p.y - 50, r: 18 };
+    }
+
+    function ballVsCircle(c: { x: number; y: number; r: number }, vx = 0, vy = 0) {
+      const dx = ball.x - c.x, dy = ball.y - c.y;
+      const d2 = dx * dx + dy * dy;
+      const r = ball.r + c.r;
+      if (d2 < r * r && d2 > 0.0001) {
+        const d = Math.sqrt(d2);
+        const nx = dx / d, ny = dy / d;
+        // Push out
+        ball.x = c.x + nx * r;
+        ball.y = c.y + ny * r;
+        // Reflect with body velocity contribution
+        const rvx = ball.vx - vx, rvy = ball.vy - vy;
+        const dot = rvx * nx + rvy * ny;
+        if (dot < 0) {
+          const restitution = 1.15;
+          ball.vx = ball.vx - (1 + restitution) * dot * nx;
+          ball.vy = ball.vy - (1 + restitution) * dot * ny;
+        }
+        return true;
+      }
+      return false;
+    }
+
+    function updateBall() {
+      ball.vy += GRAV * 0.85;
+      ball.vx *= 0.995;
+      ball.x += ball.vx;
+      ball.y += ball.vy;
+      ball.spin += ball.vx * 0.05;
+      // Walls
+      if (ball.x < ball.r) { ball.x = ball.r; ball.vx = Math.abs(ball.vx) * 0.7; }
+      if (ball.x > W - ball.r) { ball.x = W - ball.r; ball.vx = -Math.abs(ball.vx) * 0.7; }
+      // Ceiling
+      if (ball.y < ball.r + 10) { ball.y = ball.r + 10; ball.vy = Math.abs(ball.vy) * 0.7; }
+      // Ground
+      if (ball.y > GROUND - ball.r) {
+        ball.y = GROUND - ball.r;
+        ball.vy = -Math.abs(ball.vy) * 0.6;
+        ball.vx *= 0.85;
+      }
+      // Hoop posts (vertical stand)
+      ballVsCircle({ x: POST_X_L, y: HOOP_H + 2, r: 6 });
+      ballVsCircle({ x: POST_X_R, y: HOOP_H + 2, r: 6 });
+      // Rim endpoints (treat as 2 small circles each side)
+      // Left hoop: rim spans from POST_X_L+12 .. POST_X_L+12+RIM_W
+      const L_left = { x: POST_X_L + 8, y: HOOP_H, r: 5 };
+      const L_right = { x: POST_X_L + 8 + RIM_W, y: HOOP_H, r: 5 };
+      const R_right = { x: POST_X_R - 8, y: HOOP_H, r: 5 };
+      const R_left = { x: POST_X_R - 8 - RIM_W, y: HOOP_H, r: 5 };
+      ballVsCircle(L_left); ballVsCircle(L_right);
+      ballVsCircle(R_left); ballVsCircle(R_right);
+
+      // Score detection: ball passing downward through rim line
+      const passingDown = ball.vy > 0;
+      if (passingDown && resetCool === 0) {
+        // Left hoop scored => Right player scores
+        if (
+          ball.y - ball.r > HOOP_H - 4 &&
+          ball.y - ball.r < HOOP_H + 8 &&
+          ball.x > L_left.x + 4 && ball.x < L_right.x - 4
+        ) {
+          scoreRight();
+        } else if (
+          ball.y - ball.r > HOOP_H - 4 &&
+          ball.y - ball.r < HOOP_H + 8 &&
+          ball.x > R_left.x + 4 && ball.x < R_right.x - 4
+        ) {
+          scoreLeft();
+        }
+      }
+    }
+
+    function scoreLeft() {
+      const s = { ...scoreRef.current, l: scoreRef.current.l + 1 };
+      setScore(s);
+      lastScore = performance.now();
+      resetCool = 60;
+      setTimeout(() => {
+        ball = makeBall("R");
+        pL = makePlayer("L"); pR = makePlayer("R");
+        if (s.l >= 5) setWinner("Left wins!");
+      }, 700);
+    }
+    function scoreRight() {
+      const s = { ...scoreRef.current, r: scoreRef.current.r + 1 };
+      setScore(s);
+      lastScore = performance.now();
+      resetCool = 60;
+      setTimeout(() => {
+        ball = makeBall("L");
+        pL = makePlayer("L"); pR = makePlayer("R");
+        if (s.r >= 5) setWinner("Right wins!");
+      }, 700);
+    }
+
+    function aiDecide(): boolean {
+      // Predict ball trajectory; jump when close & ball above
+      const dx = ball.x - pR.x;
+      const reactDist = aiDiff === "easy" ? 90 : aiDiff === "hard" ? 220 : 150;
+      const noise = aiDiff === "easy" ? 0.55 : aiDiff === "hard" ? 0.05 : 0.2;
+      // Approach the ball if it's on right half, else defend hoop
+      if (ball.x > W * 0.45) {
+        if (Math.abs(dx) < reactDist && ball.y < pR.y - 30 && pR.onGround) return Math.random() > noise;
+        if (!pR.onGround && ball.y < pR.y && Math.abs(dx) < 80) return Math.random() > noise * 0.5;
+      } else {
+        // Walk back toward right hoop area by tapping toward it (only jump if ball nearby)
+        if (Math.abs(dx) < 60 && pR.onGround) return Math.random() > noise;
+      }
+      return false;
+    }
+
+    let raf = 0;
+    function loop() {
+      // input
+      const lp = lKey || (touch as any).l;
+      let rp = rKey || (touch as any).r;
+      if (mode === "ai") rp = aiDecide();
+      applyJumpKey(pL, lp);
+      applyJumpKey(pR, rp);
+
+      updatePlayer(pL);
+      updatePlayer(pR);
+      updateBall();
+
+      // collisions w/ player parts
+      const lLeg = legEnd(pL);
+      const rLeg = legEnd(pR);
+      ballVsCircle({ x: lLeg.x, y: lLeg.y, r: 14 }, lLeg.vx, lLeg.vy);
+      ballVsCircle({ x: rLeg.x, y: rLeg.y, r: 14 }, rLeg.vx, rLeg.vy);
+      const lH = headPos(pL), rH = headPos(pR);
+      ballVsCircle(lH, pL.vx, pL.vy);
+      ballVsCircle(rH, pR.vx, pR.vy);
+      ballVsCircle(bodyPos(pL), pL.vx, pL.vy);
+      ballVsCircle(bodyPos(pR), pR.vx, pR.vy);
+
+      if (resetCool > 0) resetCool--;
+
+      // Render
+      // sky
+      const grd = ctx.createLinearGradient(0, 0, 0, H);
+      grd.addColorStop(0, "#fde68a"); grd.addColorStop(1, "#fcd34d");
+      ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
+      // crowd silhouette
+      ctx.fillStyle = "#7c2d12";
+      for (let i = 0; i < 40; i++) {
+        const x = i * (W / 40);
+        ctx.beginPath(); ctx.arc(x, GROUND - 8, 12, 0, Math.PI * 2); ctx.fill();
+      }
+      // ground
+      ctx.fillStyle = "#92400e"; ctx.fillRect(0, GROUND, W, H - GROUND);
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, GROUND, W, 3);
+      // hoops
+      drawHoop(ctx, POST_X_L, GROUND, HOOP_H, "L", RIM_W);
+      drawHoop(ctx, POST_X_R, GROUND, HOOP_H, "R", RIM_W);
+
+      // ball
+      ctx.save();
+      ctx.translate(ball.x, ball.y);
+      ctx.rotate(ball.spin * 0.05);
+      ctx.fillStyle = "#ea580c";
+      ctx.beginPath(); ctx.arc(0, 0, ball.r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "#1c1917"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(0, 0, ball.r, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-ball.r, 0); ctx.lineTo(ball.r, 0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, -ball.r); ctx.lineTo(0, ball.r); ctx.stroke();
+      ctx.restore();
+
+      drawPlayer(ctx, pL, lLeg);
+      drawPlayer(ctx, pR, rLeg);
+
+      // score banner
+      ctx.fillStyle = "rgba(0,0,0,.7)";
+      ctx.fillRect(W / 2 - 70, 10, 140, 38);
+      ctx.fillStyle = "#fff"; ctx.font = "bold 26px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(`${scoreRef.current.l}  :  ${scoreRef.current.r}`, W / 2, 38);
+      ctx.font = "12px system-ui"; ctx.fillStyle = "#fbbf24";
+      ctx.fillText("First to 5", W / 2, 56);
+
+      raf = requestAnimationFrame(loop);
+    }
+    raf = requestAnimationFrame(loop);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("keydown", onDown);
+      window.removeEventListener("keyup", onUp);
+    };
+  }, [mode, aiDiff]);
+
+  function drawHoop(
+    ctx: CanvasRenderingContext2D, postX: number, ground: number, hoopH: number, side: "L" | "R", rimW: number,
+  ) {
+    // Backboard pole
+    ctx.fillStyle = "#374151";
+    ctx.fillRect(postX - 5, hoopH - 60, 10, ground - (hoopH - 60));
+    // Backboard
+    const bbX = side === "L" ? postX - 4 : postX - 4;
+    ctx.fillStyle = "#f3f4f6"; ctx.fillRect(bbX, hoopH - 60, 8, 70);
+    ctx.strokeStyle = "#111"; ctx.strokeRect(bbX, hoopH - 60, 8, 70);
+    // Square on backboard
+    ctx.strokeStyle = "#dc2626"; ctx.lineWidth = 2;
+    ctx.strokeRect(bbX + (side === "L" ? 8 : -28) + (side === "L" ? 0 : 30), hoopH - 30, 20, 14);
+    ctx.lineWidth = 1;
+    // Rim
+    const rimX = side === "L" ? postX + 8 : postX - 8 - rimW;
+    ctx.strokeStyle = "#ef4444"; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(rimX, hoopH); ctx.lineTo(rimX + rimW, hoopH); ctx.stroke();
+    ctx.lineWidth = 1;
+    // Net
+    ctx.strokeStyle = "#fff";
+    for (let i = 0; i <= 6; i++) {
+      const t = i / 6;
+      const x = rimX + t * rimW;
+      ctx.beginPath(); ctx.moveTo(x, hoopH);
+      ctx.lineTo(rimX + rimW * (0.2 + t * 0.6), hoopH + 26);
+      ctx.stroke();
+    }
+    ctx.beginPath(); ctx.moveTo(rimX + 4, hoopH + 26); ctx.lineTo(rimX + rimW - 4, hoopH + 26); ctx.stroke();
+  }
+
+  function drawPlayer(ctx: CanvasRenderingContext2D, p: BRPlayer, leg: { x: number; y: number }) {
+    // Body
+    ctx.strokeStyle = "#111"; ctx.lineWidth = 5; ctx.lineCap = "round";
+    // Hip to head
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - 30);
+    ctx.lineTo(p.x, p.y - 70);
+    ctx.stroke();
+    // Head
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y - 84, 14, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#111"; ctx.beginPath(); ctx.arc(p.x, p.y - 84, 14, 0, Math.PI * 2); ctx.stroke();
+    // Eyes
+    ctx.fillStyle = "#fff";
+    const eyeOff = p.facing * 4;
+    ctx.beginPath(); ctx.arc(p.x + eyeOff, p.y - 86, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#000";
+    ctx.beginPath(); ctx.arc(p.x + eyeOff + p.facing, p.y - 86, 1.4, 0, Math.PI * 2); ctx.fill();
+    // Body torso (jersey)
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y - 50, 16, 22, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#111"; ctx.stroke();
+    // Number
+    ctx.fillStyle = "#fff"; ctx.font = "bold 16px system-ui"; ctx.textAlign = "center";
+    ctx.fillText(p.side === "L" ? "1" : "2", p.x, p.y - 44);
+    // Arms
+    ctx.strokeStyle = "#fde68a"; ctx.lineWidth = 5;
+    const armLen = 26;
+    const aA = -Math.PI / 2 + p.armAngle * p.facing;
+    const aHand = { x: p.x + Math.cos(aA) * armLen * p.facing, y: p.y - 50 + Math.sin(aA) * armLen };
+    ctx.beginPath(); ctx.moveTo(p.x, p.y - 55); ctx.lineTo(aHand.x, aHand.y); ctx.stroke();
+    // Legs
+    ctx.strokeStyle = "#1f2937"; ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - 30);
+    ctx.lineTo(leg.x, leg.y);
+    ctx.stroke();
+    // Other (planted) leg
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - 30);
+    ctx.lineTo(p.x - p.facing * 8, p.y);
+    ctx.stroke();
+    // Shoes
+    ctx.fillStyle = "#fff";
+    ctx.beginPath(); ctx.arc(leg.x, leg.y, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x - p.facing * 8, p.y, 5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  if (winner) {
+    return (
+      <div className="text-center space-y-4 p-6">
+        <div className="text-4xl font-black">{winner}</div>
+        <div className="text-muted-foreground">Final score {score.l} – {score.r}</div>
+        <Button onClick={() => { setScore({ l: 0, r: 0 }); setWinner(null); setMode(null); }}>Play again</Button>
+      </div>
+    );
+  }
+
+  if (!mode) {
+    return (
+      <div className="space-y-4 p-2">
+        <div className="text-center">
+          <h3 className="text-2xl font-bold">🏀 Basket Random</h3>
+          <p className="text-muted-foreground text-sm">Press one key to flail your stick figure. Whoever scores 5 wins.</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => setMode("2p")}
+            className="p-6 rounded-2xl border border-border hover:border-primary text-left"
+          >
+            <div className="text-3xl mb-1">👥</div>
+            <div className="font-bold">2 Players</div>
+            <div className="text-xs text-muted-foreground">Left: <kbd>W</kbd> · Right: <kbd>↑</kbd></div>
+          </button>
+          <button
+            onClick={() => setMode("ai")}
+            className="p-6 rounded-2xl border border-border hover:border-primary text-left"
+          >
+            <div className="text-3xl mb-1">🤖</div>
+            <div className="font-bold">vs AI</div>
+            <div className="text-xs text-muted-foreground">You play left with <kbd>W</kbd></div>
+          </button>
+        </div>
+        {mode === null && (
+          <div className="flex items-center justify-center gap-2 text-xs">
+            <span className="text-muted-foreground">AI difficulty:</span>
+            {(["easy", "normal", "hard"] as const).map((d) => (
+              <button
+                key={d}
+                onClick={() => setAiDiff(d)}
+                className={`px-3 py-1 rounded-full border ${aiDiff === d ? "bg-primary text-primary-foreground border-primary" : "border-border"}`}
+              >{d}</button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between text-sm">
+        <div>
+          <span className="font-bold text-rose-600">P1 (W)</span>
+          {mode === "2p" ? <span className="ml-3 font-bold text-blue-600">P2 (↑)</span> : <span className="ml-3 font-bold text-blue-600">AI ({aiDiff})</span>}
+        </div>
+        <Button variant="outline" size="sm" onClick={() => { setScore({ l: 0, r: 0 }); setMode(null); }}>Quit</Button>
+      </div>
+      <canvas ref={canvasRef} width={760} height={420} className="w-full max-w-full bg-amber-200 rounded-2xl border border-border touch-none" />
+      <div className="flex justify-between gap-3">
+        <button
+          onPointerDown={() => { ((window as any).__br_touch || {}).l = true; }}
+          onPointerUp={() => { ((window as any).__br_touch || {}).l = false; }}
+          onPointerLeave={() => { ((window as any).__br_touch || {}).l = false; }}
+          className="flex-1 py-4 rounded-2xl bg-rose-600 text-white font-bold active:scale-95 select-none"
+        >P1 JUMP (W)</button>
+        {mode === "2p" && (
+          <button
+            onPointerDown={() => { ((window as any).__br_touch || {}).r = true; }}
+            onPointerUp={() => { ((window as any).__br_touch || {}).r = false; }}
+            onPointerLeave={() => { ((window as any).__br_touch || {}).r = false; }}
+            className="flex-1 py-4 rounded-2xl bg-blue-600 text-white font-bold active:scale-95 select-none"
+          >P2 JUMP (↑)</button>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground text-center">Move toward the ball, jump and flail to kick it into the opposite hoop. First to 5 wins.</p>
+    </div>
+  );
+}
