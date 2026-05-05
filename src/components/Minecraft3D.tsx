@@ -365,7 +365,7 @@ export function Minecraft3D() {
           <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-white text-center pointer-events-none">
             <div>
               <p className="font-bold">Click to play</p>
-              <p className="text-xs">WASD move · Space jump · Mouse look · Left-click break · Right-click place · 1-7 select · ESC unlock</p>
+              <p className="text-xs">WASD move · Space jump · Mouse look · Left-click break/attack mob · Right-click place · 1-9 select · ESC unlock</p>
             </div>
           </div>
         )}
