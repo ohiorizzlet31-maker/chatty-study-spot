@@ -517,6 +517,11 @@ export function MinesGame() {
   function pick(i: number) {
     if (round !== "play" || grid[i].revealed) return;
     const g = grid.map(c => ({...c}));
+    // Rigged: never hit a mine — swap mine off this cell to an unrevealed safe one.
+    if (isRigged() && g[i].mine) {
+      const safeIdx = g.findIndex(c => !c.mine && !c.revealed);
+      if (safeIdx >= 0) { g[safeIdx].mine = true; g[i].mine = false; }
+    }
     g[i].revealed = true;
     if (g[i].mine) {
       g.forEach(c => { if (c.mine) c.revealed = true; });
