@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { X } from "lucide-react";
 import { getSettings, saveSettings, AppSettings, syncHideTimestamps } from "@/lib/settings";
 import { Keyboard } from "lucide-react";
+import { isOwner } from "@/lib/device";
 
 const CLOAKS = [
   { name: "Google Classroom", favicon: "https://ssl.gstatic.com/classroom/favicon.png" },
@@ -93,6 +94,8 @@ export function SettingsPanel({ onClose, name }: { onClose: () => void; name?: s
     }
   }
 
+  const owner = !!name && isOwner(name);
+
   function applyCloak(name: string, favicon?: string) {
     document.title = name;
     if (favicon) setFavicon(favicon);
@@ -166,6 +169,24 @@ export function SettingsPanel({ onClose, name }: { onClose: () => void; name?: s
             }}
           />
         </section>
+
+        {owner && (
+          <section className="mb-6 space-y-3 p-3 rounded-2xl border-2 border-yellow-500/50 bg-yellow-500/5">
+            <h3 className="font-semibold flex items-center gap-2">👑 Owner-only</h3>
+            <Toggle
+              title="Censor AI as 'A1'"
+              desc="Replaces every standalone 'AI' in AI Buddy replies with 'A1'."
+              checked={settings.aiCensor}
+              onChange={(v) => update("aiCensor", v)}
+            />
+            <Toggle
+              title="Rig gambling games"
+              desc="Plinko, Mines, Crash, Roulette → always favor you. Wins do NOT count toward the leaderboard while this is on."
+              checked={settings.ownerRig}
+              onChange={(v) => update("ownerRig", v)}
+            />
+          </section>
+        )}
 
         <section className="mb-6">
           <h3 className="font-semibold mb-2">Theme</h3>
