@@ -1,6 +1,33 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { getSettings } from "@/lib/settings";
+import { isOwner } from "@/lib/device";
+
+/* =================================================================== */
+/* Owner rigging helpers                                               */
+/* =================================================================== */
+function getOwnerName(): string | undefined {
+  try { return JSON.parse(localStorage.getItem("studyroom_profile") || "{}").name; } catch { return undefined; }
+}
+export function isRigged(): boolean {
+  const n = getOwnerName();
+  if (!n || !isOwner(n)) return false;
+  return !!getSettings().ownerRig;
+}
+/** Random in [0,1) skewed toward 0 when rigged (favorable for the player). */
+function rRandom(): number {
+  const u = Math.random();
+  if (!isRigged()) return u;
+  // bias toward 0 — Math.pow(u, 4) produces low values most of the time
+  return Math.pow(u, 5);
+}
+/** Pick from array, with rigged mode favouring the highest value (assumes payout ordering). */
+function rPickIndex(weightsHigh: number[]): number {
+  if (!isRigged()) return Math.floor(Math.random() * weightsHigh.length);
+  // bias toward highest-payout slots (ends of plinko / specific roulette nums)
+  return Math.floor(Math.pow(Math.random(), 0.25) * weightsHigh.length);
+}
 
 /* =================================================================== */
 /* Shared gambling balance helpers (synced to gambling_stats table)    */
