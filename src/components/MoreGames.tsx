@@ -835,7 +835,25 @@ export function Roulette() {
     setSpinning(true);
     setMsg("");
     setResult(null);
-    const winner = ROULETTE_NUMS[Math.floor(Math.random() * ROULETTE_NUMS.length)];
+    let winner = ROULETTE_NUMS[Math.floor(Math.random() * ROULETTE_NUMS.length)];
+    if (isRigged()) {
+      // Find the number that maximises payout given current bets.
+      let bestN = winner, bestPay = -1;
+      for (const n of ROULETTE_NUMS) {
+        const c = colorOf(n);
+        let p = 0;
+        if (c === "red") p += bets.red * 2;
+        if (c === "black") p += bets.black * 2;
+        if (c === "green") p += bets.green * 14;
+        if (n !== 0 && n % 2 === 0) p += bets.even * 2;
+        if (n % 2 === 1) p += bets.odd * 2;
+        if (n >= 1 && n <= 18) p += bets.low * 2;
+        if (n >= 19 && n <= 36) p += bets.high * 2;
+        p += (bets.numbers[n] || 0) * 36;
+        if (p > bestPay) { bestPay = p; bestN = n; }
+      }
+      if (bestPay > 0) winner = bestN;
+    }
     let ticks = 0;
     const interval = setInterval(() => {
       setResult(ROULETTE_NUMS[Math.floor(Math.random() * ROULETTE_NUMS.length)]);
