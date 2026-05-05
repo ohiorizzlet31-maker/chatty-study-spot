@@ -1,6 +1,33 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { getSettings } from "@/lib/settings";
+import { isOwner } from "@/lib/device";
+
+/* =================================================================== */
+/* Owner rigging helpers                                               */
+/* =================================================================== */
+function getOwnerName(): string | undefined {
+  try { return JSON.parse(localStorage.getItem("studyroom_profile") || "{}").name; } catch { return undefined; }
+}
+export function isRigged(): boolean {
+  const n = getOwnerName();
+  if (!n || !isOwner(n)) return false;
+  return !!getSettings().ownerRig;
+}
+/** Random in [0,1) skewed toward 0 when rigged (favorable for the player). */
+function rRandom(): number {
+  const u = Math.random();
+  if (!isRigged()) return u;
+  // bias toward 0 — Math.pow(u, 4) produces low values most of the time
+  return Math.pow(u, 5);
+}
+/** Pick from array, with rigged mode favouring the highest value (assumes payout ordering). */
+function rPickIndex(weightsHigh: number[]): number {
+  if (!isRigged()) return Math.floor(Math.random() * weightsHigh.length);
+  // bias toward highest-payout slots (ends of plinko / specific roulette nums)
+  return Math.floor(Math.pow(Math.random(), 0.25) * weightsHigh.length);
+}
 
 /* =================================================================== */
 /* Shared gambling balance helpers (synced to gambling_stats table)    */
@@ -17,6 +44,8 @@ function saveGBalance(v: number) {
     catch { return undefined; }
   })();
   if (!name) return;
+  // Owner with rig enabled: don't pollute leaderboard with fake winnings.
+  if (isOwner(name) && getSettings().ownerRig) return;
   // upsert to gambling_stats so leaderboard works
   (supabase as any).from("gambling_stats").upsert(
     { name, balance: Math.round(v * 100) / 100, updated_at: new Date().toISOString() },
@@ -350,7 +379,15 @@ export function Plinko() {
   function drop() {
     if (balance < bet || bet <= 0) return;
     setBalance(balance - bet);
-    ballsRef.current.push({ x: W/2 + (Math.random()-0.5)*20, y: 10, vx: (Math.random()-0.5)*0.5, vy: 0, bet });
+    // When rigged: heavy bias to one of the outer 5x slots (left or right edge).
+    let startX = W/2 + (Math.random()-0.5)*20;
+    let vx0 = (Math.random()-0.5)*0.5;
+    if (isRigged()) {
+      const left = Math.random() < 0.5;
+      startX = left ? 8 : W - 8;
+      vx0 = left ? -2.5 : 2.5;
+    }
+    ballsRef.current.push({ x: startX, y: 10, vx: vx0, vy: 0, bet });
   }
 
   useEffect(() => {
@@ -480,6 +517,11 @@ export function MinesGame() {
   function pick(i: number) {
     if (round !== "play" || grid[i].revealed) return;
     const g = grid.map(c => ({...c}));
+    // Rigged: never hit a mine — swap mine off this cell to an unrevealed safe one.
+    if (isRigged() && g[i].mine) {
+      const safeIdx = g.findIndex(c => !c.mine && !c.revealed);
+      if (safeIdx >= 0) { g[safeIdx].mine = true; g[i].mine = false; }
+    }
     g[i].revealed = true;
     if (g[i].mine) {
       g.forEach(c => { if (c.mine) c.revealed = true; });
@@ -655,11 +697,13 @@ export function Crash() {
     // P(X >= m) = 0.99 / m  =>  X = 0.99 / U where U uniform(0,1)
     const u = Math.random();
     const c = Math.max(1.0, Math.floor((0.99 / Math.max(0.0001, u)) * 100) / 100);
-    stateRef.current.crashAt = c;
+    // Rigged: crash way above autoCashout target so owner always wins.
+    const rigged = isRigged() ? Math.max(c, autoCashout * (1.5 + Math.random() * 5)) : c;
+    stateRef.current.crashAt = rigged;
     stateRef.current.start = performance.now();
     stateRef.current.points = [];
     stateRef.current.cashedOut = false;
-    setCrashAt(c);
+    setCrashAt(stateRef.current.crashAt);
     setMult(1);
     setLastWin("");
     setPhase("flying");
@@ -791,7 +835,25 @@ export function Roulette() {
     setSpinning(true);
     setMsg("");
     setResult(null);
-    const winner = ROULETTE_NUMS[Math.floor(Math.random() * ROULETTE_NUMS.length)];
+    let winner = ROULETTE_NUMS[Math.floor(Math.random() * ROULETTE_NUMS.length)];
+    if (isRigged()) {
+      // Find the number that maximises payout given current bets.
+      let bestN = winner, bestPay = -1;
+      for (const n of ROULETTE_NUMS) {
+        const c = colorOf(n);
+        let p = 0;
+        if (c === "red") p += bets.red * 2;
+        if (c === "black") p += bets.black * 2;
+        if (c === "green") p += bets.green * 14;
+        if (n !== 0 && n % 2 === 0) p += bets.even * 2;
+        if (n % 2 === 1) p += bets.odd * 2;
+        if (n >= 1 && n <= 18) p += bets.low * 2;
+        if (n >= 19 && n <= 36) p += bets.high * 2;
+        p += (bets.numbers[n] || 0) * 36;
+        if (p > bestPay) { bestPay = p; bestN = n; }
+      }
+      if (bestPay > 0) winner = bestN;
+    }
     let ticks = 0;
     const interval = setInterval(() => {
       setResult(ROULETTE_NUMS[Math.floor(Math.random() * ROULETTE_NUMS.length)]);
@@ -2013,8 +2075,8 @@ export function PingPong() {
 }
 
 // ===== Basket Random =====
-// Two ragdoll-ish stick figures, one key each. Press jump to flail upward; gravity does the rest.
-// First to 5 wins. Mode: 2P (W vs ↑) or vs AI.
+// Two ragdoll-ish stick figures, one key each. Tap = jump+kick. Hold while standing
+// next to the ball and your character grabs it; release to fling. First to 5 wins.
 type BRMode = "2p" | "ai";
 type BRPlayer = {
   x: number; y: number;            // hip position
@@ -2027,6 +2089,8 @@ type BRPlayer = {
   jumpCharge: number;              // increases while key held mid-air
   color: string;
   side: "L" | "R";
+  hasBall: boolean;
+  releaseT: number;                // counts down after a release so we don't re-grab instantly
 };
 type BRBall = { x: number; y: number; vx: number; vy: number; r: number; spin: number };
 
@@ -2064,6 +2128,8 @@ export function BasketRandom() {
         legAngle: 0, armAngle: 0, jumpCharge: 0,
         color: side === "L" ? "#e11d48" : "#2563eb",
         side,
+        hasBall: false,
+        releaseT: 0,
       };
     }
     function makeBall(servingSide: "L" | "R"): BRBall {
@@ -2077,6 +2143,8 @@ export function BasketRandom() {
     let pL = makePlayer("L");
     let pR = makePlayer("R");
     let ball = makeBall(Math.random() < 0.5 ? "L" : "R");
+    // press tracking — detect key transitions for release flings
+    const wasDown = { L: false, R: false };
     let lKey = false, rKey = false;
     let lastScore = 0;
     let resetCool = 0;
@@ -2098,27 +2166,64 @@ export function BasketRandom() {
     (window as any).__br_touch = touch;
 
     function applyJumpKey(p: BRPlayer, pressed: boolean) {
-      // On ground: small forward hop + jump impulse, walks toward ball.
-      if (pressed && p.onGround) {
-        p.vy = -11;
-        // Walk toward ball
-        const dir = ball.x > p.x ? 1 : -1;
-        p.facing = dir as 1 | -1;
-        p.vx += dir * 3.2;
+      const was = wasDown[p.side];
+      // Always face the OPPOSITE hoop (the one you're scoring on).
+      p.facing = (p.side === "L" ? 1 : -1) as 1 | -1;
+
+      // Try grab: holding key + on ground + ball is close + ball mostly settled
+      if (pressed && p.onGround && !p.hasBall && p.releaseT === 0) {
+        const ddx = Math.abs(ball.x - p.x);
+        const ddy = Math.abs(ball.y - (p.y - 60));
+        if (ddx < 50 && ddy < 90 && Math.abs(ball.vy) < 14) {
+          p.hasBall = true;
+        }
+      }
+
+      // Release fling on key-up while holding ball
+      if (was && !pressed && p.hasBall) {
+        // shoot toward opposite hoop with strong arc
+        const targetX = p.side === "L" ? RIM_X_R + RIM_W / 2 : RIM_X_L + RIM_W / 2;
+        const dx = targetX - p.x;
+        // physics-ish: pick vy so ball reaches roughly hoop height, then vx for horizontal
+        const peakY = HOOP_H - 60;
+        const dy = peakY - (p.y - 60);
+        const vy0 = -Math.sqrt(Math.max(40, -2 * dy * 0.85)); // upward
+        const t = (vy0 - 0) / -0.9;                            // rough airtime
+        const vx0 = dx / Math.max(20, t);
+        ball.vx = vx0 + (Math.random() - 0.5) * 0.6;
+        ball.vy = vy0;
+        ball.x = p.x + p.facing * 18;
+        ball.y = p.y - 70;
+        p.hasBall = false;
+        p.releaseT = 25;
+      }
+
+      // Tap-jump: pressed and on ground and not holding ball
+      if (pressed && !was && p.onGround && !p.hasBall) {
+        p.vy = -10.5;
+        p.vx += p.facing * 2.6;
         p.onGround = false;
         p.jumpCharge = 0;
-      } else if (pressed && !p.onGround) {
-        // Mid-air flail: kick legs upward (toward ball) for big hit
-        p.jumpCharge = Math.min(1, p.jumpCharge + 0.06);
-        const dir = ball.x > p.x ? 1 : -1;
-        p.facing = dir as 1 | -1;
-        p.vx += dir * 0.25;
-        p.vy -= 0.18; // tiny lift while flailing
       }
+      // Mid-air flail
+      if (pressed && !p.onGround && !p.hasBall) {
+        p.jumpCharge = Math.min(1, p.jumpCharge + 0.05);
+        p.vy -= 0.15;
+        p.vx += p.facing * 0.18;
+      }
+      // If holding ball, walk toward your hoop while held
+      if (p.hasBall && p.onGround) {
+        p.vx += p.facing * 0.45;
+      }
+
+      if (p.releaseT > 0) p.releaseT--;
+
       // Animate limbs
       const target = pressed ? 1.6 : 0.0;
       p.legAngle += (target * (p.facing) - p.legAngle) * 0.25;
-      p.armAngle += ((pressed ? -1.4 : 0) - p.armAngle) * 0.2;
+      p.armAngle += ((p.hasBall ? -2.2 : pressed ? -1.4 : 0) - p.armAngle) * 0.2;
+
+      wasDown[p.side] = pressed;
     }
 
     function updatePlayer(p: BRPlayer) {
@@ -2174,6 +2279,14 @@ export function BasketRandom() {
     }
 
     function updateBall() {
+      // If a player is holding the ball, glue it above their head/arm.
+      const holder = pL.hasBall ? pL : pR.hasBall ? pR : null;
+      if (holder) {
+        ball.x = holder.x + holder.facing * 10;
+        ball.y = holder.y - 80;
+        ball.vx = holder.vx; ball.vy = holder.vy;
+        return;
+      }
       ball.vy += GRAV * 0.85;
       ball.vx *= 0.995;
       ball.x += ball.vx;
@@ -2246,17 +2359,36 @@ export function BasketRandom() {
     }
 
     function aiDecide(): boolean {
-      // Predict ball trajectory; jump when close & ball above
+      // Strategy:
+      //  - If holding ball: shoot when reasonably close to its target hoop (release key).
+      //  - Otherwise: chase the ball; press to grab when next to it on the ground.
+      const targetHoopX = RIM_X_L + RIM_W / 2; // AI is right player; scores on LEFT hoop
+      const noise = aiDiff === "easy" ? 0.35 : aiDiff === "hard" ? 0.02 : 0.12;
+
+      if (pR.hasBall) {
+        // Move toward shooting range, then release (return false to drop key)
+        const distToShootSpot = pR.x - (targetHoopX + 110); // want pR.x ≈ rim+110
+        if (distToShootSpot < 0 || Math.random() < noise) return true; // keep holding/walking
+        return false; // release => fling
+      }
+
       const dx = ball.x - pR.x;
-      const reactDist = aiDiff === "easy" ? 90 : aiDiff === "hard" ? 220 : 150;
-      const noise = aiDiff === "easy" ? 0.55 : aiDiff === "hard" ? 0.05 : 0.2;
-      // Approach the ball if it's on right half, else defend hoop
-      if (ball.x > W * 0.45) {
-        if (Math.abs(dx) < reactDist && ball.y < pR.y - 30 && pR.onGround) return Math.random() > noise;
-        if (!pR.onGround && ball.y < pR.y && Math.abs(dx) < 80) return Math.random() > noise * 0.5;
-      } else {
-        // Walk back toward right hoop area by tapping toward it (only jump if ball nearby)
-        if (Math.abs(dx) < 60 && pR.onGround) return Math.random() > noise;
+      const onMySide = ball.x > W * 0.4;
+      const close = Math.abs(dx) < 55 && pR.onGround && Math.abs(ball.y - (pR.y - 60)) < 110;
+      if (close) return true; // grab
+
+      // Move horizontally toward ball by jumping in that direction (single key + facing flip needed)
+      // Trick: AI's facing is locked, so use mid-air flail toward ball when airborne; otherwise
+      // do small hops if ball is on right side and we're far.
+      if (onMySide && pR.onGround && Math.abs(dx) > 60) {
+        // Hop in ball direction by overriding facing for one frame via vx push
+        pR.vx += (dx > 0 ? 1 : -1) * 0.6;
+        return Math.random() > noise; // jump occasionally
+      }
+      // If ball is in opponent's side, head back toward our hoop area (~RIM_X_R-100)
+      const homeX = RIM_X_R - 120;
+      if (Math.abs(pR.x - homeX) > 30) {
+        pR.vx += (homeX - pR.x > 0 ? 1 : -1) * 0.4;
       }
       return false;
     }

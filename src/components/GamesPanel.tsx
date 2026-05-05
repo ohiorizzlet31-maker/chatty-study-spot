@@ -19,6 +19,7 @@ import {
   Jackpot777,
   PingPong,
   BasketRandom,
+  SnakeFast,
 } from "@/components/MoreGames";
 import { Minecraft3D } from "@/components/Minecraft3D";
 
@@ -105,7 +106,7 @@ export function GamesPanel({ onClose, name }: { onClose: () => void; name: strin
         {game === "flappy" && <FlappyBird />}
         {game === "g2048" && <Game2048 />}
         {game === "tetris" && <Tetris />}
-        {game === "snake" && <Snake />}
+        {game === "snake" && <SnakeFast />}
         {game === "html" && <HtmlGamesPanel name={name} />}
         {game === "gnmath" && <GnMathPanel />}
         {game === "dino" && <Dino />}

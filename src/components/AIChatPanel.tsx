@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { chatWithAI } from "@/server/ai";
 import { Send, X, Sparkles, Trash2, Brain } from "lucide-react";
+import { getSettings } from "@/lib/settings";
+import { isOwner } from "@/lib/device";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -41,6 +43,15 @@ export function AIChatPanel({ onClose }: { onClose: () => void }) {
   const [memory, setMemory] = useState<string[]>(loadMemory);
   const [newFact, setNewFact] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  function maybeCensor(text: string): string {
+    let myName = "";
+    try { myName = JSON.parse(localStorage.getItem("studyroom_profile") || "{}").name || ""; } catch {}
+    if (!isOwner(myName)) return text;
+    if (!getSettings().aiCensor) return text;
+    // Replace any case-variant of "AI" as a standalone token with "A1".
+    return text.replace(/\bAI\b/g, "A1").replace(/\bai\b/gi, "A1");
+  }
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -93,7 +104,7 @@ export function AIChatPanel({ onClose }: { onClose: () => void }) {
         ? [{ role: "user", content: "::MEMORY::\n" + memory.map((f) => `- ${f}`).join("\n") }, ...next]
         : next;
       const { reply } = await chatWithAI({ data: { messages: memMsgs } });
-      setMessages((m) => [...m, { role: "assistant", content: reply }]);
+      setMessages((m) => [...m, { role: "assistant", content: maybeCensor(reply) }]);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "AI failed.";
       setMessages((m) => [...m, { role: "assistant", content: `⚠️ ${msg}` }]);

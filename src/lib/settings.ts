@@ -11,6 +11,9 @@ export type AppSettings = {
   notifyOnMessage: boolean;
   theme: "light" | "dark" | "oled";
   language: string;
+  // Owner-only flags (ignored unless isOwner(name))
+  aiCensor: boolean;       // censor AI replies → "A1"
+  ownerRig: boolean;       // rig gambling outcomes & skip leaderboard
 };
 
 const KEY = "studyroom_settings";
@@ -25,6 +28,8 @@ const DEFAULTS: AppSettings = {
   notifyOnMessage: false,
   theme: "light",
   language: "English",
+  aiCensor: false,
+  ownerRig: false,
 };
 
 export function getSettings(): AppSettings {
