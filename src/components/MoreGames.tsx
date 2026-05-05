@@ -379,7 +379,15 @@ export function Plinko() {
   function drop() {
     if (balance < bet || bet <= 0) return;
     setBalance(balance - bet);
-    ballsRef.current.push({ x: W/2 + (Math.random()-0.5)*20, y: 10, vx: (Math.random()-0.5)*0.5, vy: 0, bet });
+    // When rigged: heavy bias to one of the outer 5x slots (left or right edge).
+    let startX = W/2 + (Math.random()-0.5)*20;
+    let vx0 = (Math.random()-0.5)*0.5;
+    if (isRigged()) {
+      const left = Math.random() < 0.5;
+      startX = left ? 8 : W - 8;
+      vx0 = left ? -2.5 : 2.5;
+    }
+    ballsRef.current.push({ x: startX, y: 10, vx: vx0, vy: 0, bet });
   }
 
   useEffect(() => {
