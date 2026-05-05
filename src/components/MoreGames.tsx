@@ -698,7 +698,7 @@ export function Crash() {
     stateRef.current.start = performance.now();
     stateRef.current.points = [];
     stateRef.current.cashedOut = false;
-    setCrashAt(c);
+    setCrashAt(stateRef.current.crashAt);
     setMult(1);
     setLastWin("");
     setPhase("flying");
