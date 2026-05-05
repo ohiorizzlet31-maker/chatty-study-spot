@@ -692,7 +692,9 @@ export function Crash() {
     // P(X >= m) = 0.99 / m  =>  X = 0.99 / U where U uniform(0,1)
     const u = Math.random();
     const c = Math.max(1.0, Math.floor((0.99 / Math.max(0.0001, u)) * 100) / 100);
-    stateRef.current.crashAt = c;
+    // Rigged: crash way above autoCashout target so owner always wins.
+    const rigged = isRigged() ? Math.max(c, autoCashout * (1.5 + Math.random() * 5)) : c;
+    stateRef.current.crashAt = rigged;
     stateRef.current.start = performance.now();
     stateRef.current.points = [];
     stateRef.current.cashedOut = false;
