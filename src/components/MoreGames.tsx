@@ -2075,8 +2075,8 @@ export function PingPong() {
 }
 
 // ===== Basket Random =====
-// Two ragdoll-ish stick figures, one key each. Press jump to flail upward; gravity does the rest.
-// First to 5 wins. Mode: 2P (W vs ↑) or vs AI.
+// Two ragdoll-ish stick figures, one key each. Tap = jump+kick. Hold while standing
+// next to the ball and your character grabs it; release to fling. First to 5 wins.
 type BRMode = "2p" | "ai";
 type BRPlayer = {
   x: number; y: number;            // hip position
@@ -2089,6 +2089,8 @@ type BRPlayer = {
   jumpCharge: number;              // increases while key held mid-air
   color: string;
   side: "L" | "R";
+  hasBall: boolean;
+  releaseT: number;                // counts down after a release so we don't re-grab instantly
 };
 type BRBall = { x: number; y: number; vx: number; vy: number; r: number; spin: number };
 
@@ -2126,6 +2128,8 @@ export function BasketRandom() {
         legAngle: 0, armAngle: 0, jumpCharge: 0,
         color: side === "L" ? "#e11d48" : "#2563eb",
         side,
+        hasBall: false,
+        releaseT: 0,
       };
     }
     function makeBall(servingSide: "L" | "R"): BRBall {
@@ -2139,6 +2143,8 @@ export function BasketRandom() {
     let pL = makePlayer("L");
     let pR = makePlayer("R");
     let ball = makeBall(Math.random() < 0.5 ? "L" : "R");
+    // press tracking — detect key transitions for release flings
+    const wasDown = { L: false, R: false };
     let lKey = false, rKey = false;
     let lastScore = 0;
     let resetCool = 0;
@@ -2160,27 +2166,64 @@ export function BasketRandom() {
     (window as any).__br_touch = touch;
 
     function applyJumpKey(p: BRPlayer, pressed: boolean) {
-      // On ground: small forward hop + jump impulse, walks toward ball.
-      if (pressed && p.onGround) {
-        p.vy = -11;
-        // Walk toward ball
-        const dir = ball.x > p.x ? 1 : -1;
-        p.facing = dir as 1 | -1;
-        p.vx += dir * 3.2;
+      const was = wasDown[p.side];
+      // Always face the OPPOSITE hoop (the one you're scoring on).
+      p.facing = (p.side === "L" ? 1 : -1) as 1 | -1;
+
+      // Try grab: holding key + on ground + ball is close + ball mostly settled
+      if (pressed && p.onGround && !p.hasBall && p.releaseT === 0) {
+        const ddx = Math.abs(ball.x - p.x);
+        const ddy = Math.abs(ball.y - (p.y - 60));
+        if (ddx < 50 && ddy < 90 && Math.abs(ball.vy) < 14) {
+          p.hasBall = true;
+        }
+      }
+
+      // Release fling on key-up while holding ball
+      if (was && !pressed && p.hasBall) {
+        // shoot toward opposite hoop with strong arc
+        const targetX = p.side === "L" ? RIM_X_R + RIM_W / 2 : RIM_X_L + RIM_W / 2;
+        const dx = targetX - p.x;
+        // physics-ish: pick vy so ball reaches roughly hoop height, then vx for horizontal
+        const peakY = HOOP_H - 60;
+        const dy = peakY - (p.y - 60);
+        const vy0 = -Math.sqrt(Math.max(40, -2 * dy * 0.85)); // upward
+        const t = (vy0 - 0) / -0.9;                            // rough airtime
+        const vx0 = dx / Math.max(20, t);
+        ball.vx = vx0 + (Math.random() - 0.5) * 0.6;
+        ball.vy = vy0;
+        ball.x = p.x + p.facing * 18;
+        ball.y = p.y - 70;
+        p.hasBall = false;
+        p.releaseT = 25;
+      }
+
+      // Tap-jump: pressed and on ground and not holding ball
+      if (pressed && !was && p.onGround && !p.hasBall) {
+        p.vy = -10.5;
+        p.vx += p.facing * 2.6;
         p.onGround = false;
         p.jumpCharge = 0;
-      } else if (pressed && !p.onGround) {
-        // Mid-air flail: kick legs upward (toward ball) for big hit
-        p.jumpCharge = Math.min(1, p.jumpCharge + 0.06);
-        const dir = ball.x > p.x ? 1 : -1;
-        p.facing = dir as 1 | -1;
-        p.vx += dir * 0.25;
-        p.vy -= 0.18; // tiny lift while flailing
       }
+      // Mid-air flail
+      if (pressed && !p.onGround && !p.hasBall) {
+        p.jumpCharge = Math.min(1, p.jumpCharge + 0.05);
+        p.vy -= 0.15;
+        p.vx += p.facing * 0.18;
+      }
+      // If holding ball, walk toward your hoop while held
+      if (p.hasBall && p.onGround) {
+        p.vx += p.facing * 0.45;
+      }
+
+      if (p.releaseT > 0) p.releaseT--;
+
       // Animate limbs
       const target = pressed ? 1.6 : 0.0;
       p.legAngle += (target * (p.facing) - p.legAngle) * 0.25;
-      p.armAngle += ((pressed ? -1.4 : 0) - p.armAngle) * 0.2;
+      p.armAngle += ((p.hasBall ? -2.2 : pressed ? -1.4 : 0) - p.armAngle) * 0.2;
+
+      wasDown[p.side] = pressed;
     }
 
     function updatePlayer(p: BRPlayer) {
@@ -2236,6 +2279,14 @@ export function BasketRandom() {
     }
 
     function updateBall() {
+      // If a player is holding the ball, glue it above their head/arm.
+      const holder = pL.hasBall ? pL : pR.hasBall ? pR : null;
+      if (holder) {
+        ball.x = holder.x + holder.facing * 10;
+        ball.y = holder.y - 80;
+        ball.vx = holder.vx; ball.vy = holder.vy;
+        return;
+      }
       ball.vy += GRAV * 0.85;
       ball.vx *= 0.995;
       ball.x += ball.vx;
@@ -2308,17 +2359,36 @@ export function BasketRandom() {
     }
 
     function aiDecide(): boolean {
-      // Predict ball trajectory; jump when close & ball above
+      // Strategy:
+      //  - If holding ball: shoot when reasonably close to its target hoop (release key).
+      //  - Otherwise: chase the ball; press to grab when next to it on the ground.
+      const targetHoopX = RIM_X_L + RIM_W / 2; // AI is right player; scores on LEFT hoop
+      const noise = aiDiff === "easy" ? 0.35 : aiDiff === "hard" ? 0.02 : 0.12;
+
+      if (pR.hasBall) {
+        // Move toward shooting range, then release (return false to drop key)
+        const distToShootSpot = pR.x - (targetHoopX + 110); // want pR.x ≈ rim+110
+        if (distToShootSpot < 0 || Math.random() < noise) return true; // keep holding/walking
+        return false; // release => fling
+      }
+
       const dx = ball.x - pR.x;
-      const reactDist = aiDiff === "easy" ? 90 : aiDiff === "hard" ? 220 : 150;
-      const noise = aiDiff === "easy" ? 0.55 : aiDiff === "hard" ? 0.05 : 0.2;
-      // Approach the ball if it's on right half, else defend hoop
-      if (ball.x > W * 0.45) {
-        if (Math.abs(dx) < reactDist && ball.y < pR.y - 30 && pR.onGround) return Math.random() > noise;
-        if (!pR.onGround && ball.y < pR.y && Math.abs(dx) < 80) return Math.random() > noise * 0.5;
-      } else {
-        // Walk back toward right hoop area by tapping toward it (only jump if ball nearby)
-        if (Math.abs(dx) < 60 && pR.onGround) return Math.random() > noise;
+      const onMySide = ball.x > W * 0.4;
+      const close = Math.abs(dx) < 55 && pR.onGround && Math.abs(ball.y - (pR.y - 60)) < 110;
+      if (close) return true; // grab
+
+      // Move horizontally toward ball by jumping in that direction (single key + facing flip needed)
+      // Trick: AI's facing is locked, so use mid-air flail toward ball when airborne; otherwise
+      // do small hops if ball is on right side and we're far.
+      if (onMySide && pR.onGround && Math.abs(dx) > 60) {
+        // Hop in ball direction by overriding facing for one frame via vx push
+        pR.vx += (dx > 0 ? 1 : -1) * 0.6;
+        return Math.random() > noise; // jump occasionally
+      }
+      // If ball is in opponent's side, head back toward our hoop area (~RIM_X_R-100)
+      const homeX = RIM_X_R - 120;
+      if (Math.abs(pR.x - homeX) > 30) {
+        pR.vx += (homeX - pR.x > 0 ? 1 : -1) * 0.4;
       }
       return false;
     }
