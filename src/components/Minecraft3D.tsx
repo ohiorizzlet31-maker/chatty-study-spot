@@ -159,7 +159,7 @@ export function Minecraft3D() {
     }
 
     // Mobs (pigs + zombies)
-    type Mob = { mesh: THREE.Group; type: "pig"|"zombie"; vx: number; vz: number };
+    type Mob = { mesh: THREE.Group; type: "pig"|"zombie"; vx: number; vz: number; hp: number; hurtT: number };
     const mobs: Mob[] = [];
     function makeMob(type: "pig"|"zombie") {
       const g = new THREE.Group();
@@ -170,7 +170,7 @@ export function Minecraft3D() {
       head.position.set(0, 0.9, type === "pig" ? 0.7 : 0); g.add(head);
       g.position.set(Math.random() * SIZE, 8, Math.random() * SIZE);
       scene.add(g);
-      mobs.push({ mesh: g, type, vx: (Math.random()-0.5)*0.02, vz: (Math.random()-0.5)*0.02 });
+      mobs.push({ mesh: g, type, vx: (Math.random()-0.5)*0.02, vz: (Math.random()-0.5)*0.02, hp: type === "zombie" ? 4 : 3, hurtT: 0 });
     }
     for (let i = 0; i < 5; i++) makeMob("pig");
     for (let i = 0; i < 3; i++) makeMob("zombie");
@@ -213,6 +213,29 @@ export function Minecraft3D() {
     }
     const onMouseDown = (e: MouseEvent) => {
       if (document.pointerLockElement !== renderer.domElement) return;
+      // First check if a mob is in front (closer than block) — left-click attacks.
+      if (e.button === 0) {
+        raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+        const mobMeshes = mobs.flatMap(m => m.mesh.children);
+        const mobHits = raycaster.intersectObjects(mobMeshes, false);
+        const blockHit = pickBlock();
+        if (mobHits[0] && (!blockHit || mobHits[0].distance < blockHit.distance) && mobHits[0].distance < 5) {
+          // find owner mob
+          const hitObj = mobHits[0].object;
+          const m = mobs.find(mm => mm.mesh.children.includes(hitObj as any));
+          if (m) {
+            m.hp -= 1; m.hurtT = 12;
+            // knockback away from player
+            const ang = Math.atan2(m.mesh.position.x - player.x, m.mesh.position.z - player.z);
+            m.vx = Math.sin(ang) * 0.25; m.vz = Math.cos(ang) * 0.25;
+            if (m.hp <= 0) {
+              scene.remove(m.mesh);
+              const idx = mobs.indexOf(m); if (idx >= 0) mobs.splice(idx, 1);
+            }
+          }
+          return;
+        }
+      }
       const hit = pickBlock();
       if (!hit) return;
       const dist = hit.distance;
@@ -293,14 +316,22 @@ export function Minecraft3D() {
 
       // mob wander + zombie chase
       for (const m of mobs) {
+        if (m.hurtT > 0) {
+          m.hurtT--;
+          (m.mesh.children[0] as THREE.Mesh & { material: THREE.MeshLambertMaterial }).material.emissive?.setHex(m.hurtT % 4 < 2 ? 0xff0000 : 0x000000);
+        } else {
+          (m.mesh.children[0] as THREE.Mesh & { material: THREE.MeshLambertMaterial }).material.emissive?.setHex(0x000000);
+        }
         if (m.type === "zombie") {
           const dxm = player.x - m.mesh.position.x;
           const dzm = player.z - m.mesh.position.z;
           const d = Math.hypot(dxm, dzm) || 1;
-          m.mesh.position.x += (dxm/d) * 0.015;
-          m.mesh.position.z += (dzm/d) * 0.015;
+          m.mesh.position.x += (dxm/d) * 0.025 + m.vx;
+          m.mesh.position.z += (dzm/d) * 0.025 + m.vz;
+          m.vx *= 0.9; m.vz *= 0.9;
         } else {
           m.mesh.position.x += m.vx; m.mesh.position.z += m.vz;
+          m.vx *= 0.95; m.vz *= 0.95;
           if (Math.random() < 0.005) { m.vx = (Math.random()-0.5)*0.02; m.vz = (Math.random()-0.5)*0.02; }
         }
         // basic gravity for mob
