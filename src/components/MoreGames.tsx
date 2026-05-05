@@ -44,6 +44,8 @@ function saveGBalance(v: number) {
     catch { return undefined; }
   })();
   if (!name) return;
+  // Owner with rig enabled: don't pollute leaderboard with fake winnings.
+  if (isOwner(name) && getSettings().ownerRig) return;
   // upsert to gambling_stats so leaderboard works
   (supabase as any).from("gambling_stats").upsert(
     { name, balance: Math.round(v * 100) / 100, updated_at: new Date().toISOString() },
